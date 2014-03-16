@@ -19,6 +19,7 @@
 #include <sys/socket.h>
 #include <pthread.h>
 #include <arpa/inet.h>
+#include <openssl/sha.h>
 
 #define DBG				fprintf(stderr, "Line %d\n", __LINE__)
 #define error(msg)		do {perror(msg); exit(1);} while(0)
@@ -35,6 +36,7 @@ typedef struct {
 
 static void sig_handler(int __attribute__((unused)) signo) {
 		printf("I: Recebido SIGINT\n");
+		close(s);
 		///@TODO: atualizar .dados antes de fechar
 		exit(0);
 }
@@ -46,6 +48,12 @@ void* th_conecao_cliente(void *tmp) {
 	close(args->fd_con);
 	free(args);
 	return NULL;
+}
+
+inline unsigned char *sha256(const void *frase) {
+	 return SHA256(frase, strlen(frase), NULL);	// recebendo um ponteiro nulo como destino,
+												// o hash é salvo em um vetor estático e sobrescrito
+												// cada vez que a função é chamada
 }
 
 int main (int argc, char **argv) {
@@ -68,7 +76,6 @@ int main (int argc, char **argv) {
 	}
 	// a mensagem pode ser usada para negociar hashes com o cliente para autenticação
 	printf("Porta %hu, %d clientes já conectados, %d caronas dadas\n", porta, total_cli, total_caronas);
-	
 	try(s = socket(AF_INET, SOCK_STREAM, 0), "socket");	// tenta criar socket
 	
 	struct sockaddr_in endereco_serv, endereco_cliente;
