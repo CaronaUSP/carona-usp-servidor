@@ -6,54 +6,87 @@
  * Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0).
 *******************************************************************************/
 
-///@WARN: Apenas um esqueleto para iniciar o projeto.
-///Thread inicial abre uma porta IPv4, espera coneções e cria uma thread por cliente.
-///As threads fecham as coneções e liberam sua memória.
-///Foi escrito apenas de base e possui muitos @TODO/@FIXME
+#include "server.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <signal.h>
-#include <sys/socket.h>
-#include <pthread.h>
-#include <arpa/inet.h>
-#include <openssl/sha.h>
-
-#define DBG				fprintf(stderr, "Line %d\n", __LINE__)
-#define error(msg)		do {perror(msg); exit(1);} while(0)
-#define try(cmd,msg)	do {if ((cmd) == -1) {error(msg);}} while(0)
-#define try0(cmd,msg)	do {if ((cmd) == NULL) {error(msg);}} while(0)
-
-int s, total_con = 0, total_cli, total_caronas;
-pthread_t thread_abandonada;
+int s, clientes_agora = 0, clientes_total, caronas_total;
+int pilha_threads_livres[MAX_CLIENTES];
+int desligando = 0;
+pthread_t threads[MAX_CLIENTES];
+pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER;
 
 // argumentos que serão enviados às threads:
 typedef struct {
-	int fd_con;	// file descriptor da coneção
+	int fd_con;		// file descriptor da conexão
+	int n_thread;	// número da thread
 } args_thread;
 
+// recebimento de SIGINT
 static void sig_handler(int __attribute__((unused)) signo) {
 		printf("I: Recebido SIGINT\n");
-		close(s);
+		///@TODO: otimizar loop (i * j iterações) e controlar melhor deadlocks (usar variável "desligando" pode ser inseguro)
+		// fecha todas as conexões
+		desligando = 1;
+		pthread_mutex_lock(&mutex_modifica_thread);
+		int i;
+		for (i = 0; i < MAX_CLIENTES; i++) {
+			int j;
+			for (j = clientes_agora; j < MAX_CLIENTES; j++)
+				if (pilha_threads_livres[j] == i)
+					break;		// para ao encontrar que thread não estava sendo usada
+			if (pilha_threads_livres[j] != i) {	// se estava sendo usada
+				printf("Fechando thread %d\n", i);
+				pthread_cancel(threads[i]);
+				pthread_join(threads[i], NULL);
+			}
+		}
+		pthread_mutex_unlock(&mutex_modifica_thread);
+		pthread_mutex_destroy(&mutex_modifica_thread);
 		///@TODO: atualizar .dados antes de fechar
+		close(s);
 		exit(0);
 }
 
-void* th_conecao_cliente(void *tmp) {
-	args_thread *args = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
-							// então precisamos marcar o tipo de ponteiro recebido ou usar casts
-	printf("Thread criada, fd = %d\n", args->fd_con);
+// limpeza de recursos ao terminar thread
+void* th_limpeza(void *tmp) {
+	args_thread *args = tmp;
+	if (!desligando) {		// setada se estamos fechando o programa e precisamos apenas
+							// liberar os recursos, sem adicionar a thread novamente à pilha
+		pthread_mutex_lock(&mutex_modifica_thread);
+		clientes_agora--;
+		pilha_threads_livres[clientes_agora] = args->n_thread;
+		pthread_mutex_unlock(&mutex_modifica_thread);
+		printf("Thread %d: disconexão\n", args->n_thread);
+	}
 	close(args->fd_con);
 	free(args);
 	return NULL;
 }
 
-inline unsigned char *sha256(const void *frase) {
-	 return SHA256(frase, strlen(frase), NULL);	// recebendo um ponteiro nulo como destino,
-												// o hash é salvo em um vetor estático e sobrescrito
-												// cada vez que a função é chamada
+void* th_conecao_cliente(void *tmp) {
+	args_thread *args = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
+							// então precisamos marcar o tipo de ponteiro recebido ou usar casts
+	pthread_cleanup_push((void *)th_limpeza, tmp);
+	printf("Thread criada, fd = %d\n", args->fd_con);
+	char mensagem[200] = MSG_INICIAL;	///@FIXME: assume que dados iniciais cabem em 200 bytes
+	sprintf(mensagem + sizeof(MSG_INICIAL) - 1, "%s\n%d clientes já conectados, %d atualmente, %d caronas dadas",
+				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
+	write(args->fd_con, mensagem, strlen(mensagem));
+	char credenciais[4 + 4 + 32];	// assinatura do app + # USP + hash sha-256
+	read(args->fd_con, credenciais, 32 + 4);
+	uint32_t assinatura = *((uint32_t *) credenciais), numero_usp = *((uint32_t *) credenciais + 1);
+	if (assinatura == SEQ_CLIENTE) {
+		if (numero_usp < NUMERO_TOTAL_USUARIOS) {
+			if (senha_correta(numero_usp, mensagem, &credenciais[8])) {
+				write(args->fd_con, "Aceito", 6);
+				printf("%d: autenticado\n", args->n_thread);
+			}
+			else printf("%d: senha errada\n", args->n_thread);
+		} else
+			printf("%d: usuário %d inexistente\n", args->n_thread, numero_usp);
+	} else
+		printf("%d: assinatura errada\n", args->n_thread);
+	pthread_cleanup_pop(1);
+	return NULL;
 }
 
 int main (int argc, char **argv) {
@@ -63,8 +96,8 @@ int main (int argc, char **argv) {
 	}
 	
 	FILE *dados;	// leitura de dados de inicialização do servidor
-	try0(dados = fopen(".dados", "r"), "fopen");		// leitura + escrita do início do arquivo
-	if (fscanf(dados, "%d%d", &total_cli, &total_caronas) < 2) {
+	try0(dados = fopen(".dados", "r"), "fopen");		// leitura do início do arquivo
+	if (fscanf(dados, "%d%d", &clientes_total, &caronas_total) < 2) {
 		printf("Falha na leitura de .dados\n");
 		exit(1);
 	}
@@ -74,8 +107,13 @@ int main (int argc, char **argv) {
 		fprintf(stderr, "Porta mal formatada\n");
 		exit(1);
 	}
-	// a mensagem pode ser usada para negociar hashes com o cliente para autenticação
-	printf("Porta %hu, %d clientes já conectados, %d caronas dadas\n", porta, total_cli, total_caronas);
+	
+	// pilha com threads livres
+	int i;
+	for (i = 0; i < MAX_CLIENTES; i++) {
+		pilha_threads_livres[i] = i;
+	}
+	
 	try(s = socket(AF_INET, SOCK_STREAM, 0), "socket");	// tenta criar socket
 	
 	struct sockaddr_in endereco_serv, endereco_cliente;
@@ -89,24 +127,42 @@ int main (int argc, char **argv) {
 	if (listen(s, 1) == -1)		// ouve coneções
 		error("listen");
 	
+	// se recebermos SIGINT, fecharemos o servidor
 	struct sigaction sinal;
 	memset((char *) &sinal, 0, sizeof(sinal));
 	sinal.sa_handler = sig_handler;
 	try(sigaction(SIGINT, &sinal, NULL), "sigaction");
 	
+	// mutex para atualização de dados comuns às threads
+	pthread_mutex_init(&mutex_modifica_thread, NULL);
+	
 	for (;;) {
 		///@TODO: aceitar uma coneção por IP (evitar DoS) e limitar tentativas de login,
 		///checar timeouts/trajetos cíclicos/outros modos de quebrar o servidor
+		// argumentos que serão enviados às threads
 		args_thread *argumentos = malloc(sizeof(args_thread));
 		socklen_t clilen = sizeof(struct sockaddr_in);	// tamanho da estrutura de dados do cliente
-		try(argumentos->fd_con = accept(s, (struct sockaddr *) &endereco_cliente, &clilen), "accept");
+		for (;;) {
+			// aceita conexão e salva fd nos argumentos para a thread
+			try(argumentos->fd_con = accept(s, (struct sockaddr *) &endereco_cliente, &clilen), "accept");
+			if (clientes_agora == MAX_CLIENTES) {
+				write(argumentos->fd_con, MSG_LIMITE, sizeof(MSG_LIMITE));
+				close(argumentos->fd_con);
+				continue;
+			}
+			break;
+		}
+		pthread_mutex_lock(&mutex_modifica_thread);
+		// retira uma thread da pilha
+		argumentos->n_thread = clientes_agora;
+		clientes_agora++;
+		clientes_total++;
+		pthread_create(&threads[pilha_threads_livres[clientes_agora]], NULL, th_conecao_cliente, argumentos);	// free() de argumentos será pela thread
+		pthread_mutex_unlock(&mutex_modifica_thread);
 		///@TODO: salvar endereço do cliente para cada thread (pelo menos para ter um log)
-		total_con++;
-		char ip[16];	///@WARN: IPv6 usa mais que 15 caracteres! Editar se for usá-lo!
+		char ip[16];	///@WARN: IPv6 usa mais que 16 caracteres! Editar se for usá-lo!
 		try0(inet_ntop(AF_INET, &endereco_cliente.sin_addr, ip, sizeof(ip) - 1), "inet_ntop");
-		///@FIXME: a thread é criada e abandonada (thread_abandonada é um nome sugestivo?)
-		printf("%s conectado (fd = %d) total %d\n", ip, argumentos->fd_con, total_con);
-		pthread_create(&thread_abandonada, NULL, th_conecao_cliente, argumentos);	// free() de argumentos será pela thread
+		printf("%s conectado (fd = %d) total %d\n", ip, argumentos->fd_con, clientes_agora);
 	}
 }
 
