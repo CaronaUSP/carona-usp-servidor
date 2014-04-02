@@ -20,7 +20,9 @@ typedef struct {
 	int n_thread;	// número da thread
 } args_thread;
 
-// recebimento de SIGINT
+// Se recebermos SIGINT, paramos o programa fechando as conexões.
+// O código está com um loop lento e precisa ser arrumado (usar variável "desligando"
+// para evitar deadlock não é uma boa ideia)
 static void sig_handler(int __attribute__((unused)) signo) {
 		printf("I: Recebido SIGINT\n");
 		///@TODO: otimizar loop (i * j iterações) e controlar melhor deadlocks (usar variável "desligando" pode ser inseguro)
@@ -46,7 +48,7 @@ static void sig_handler(int __attribute__((unused)) signo) {
 		exit(0);
 }
 
-// limpeza de recursos ao terminar thread
+// Limpeza de recursos ao terminar thread
 void* th_limpeza(void *tmp) {
 	args_thread *args = tmp;
 	if (!desligando) {		// setada se estamos fechando o programa e precisamos apenas
@@ -64,15 +66,20 @@ void* th_limpeza(void *tmp) {
 
 void* th_conecao_cliente(void *tmp) {
 	args_thread *args = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
-							// então precisamos marcar o tipo de ponteiro recebido ou usar casts
+								// então precisamos marcar o tipo de ponteiro recebido ou usar casts
 	pthread_cleanup_push((void *)th_limpeza, tmp);
 	printf("Thread criada, fd = %d\n", args->fd_con);
 	char mensagem[200] = MSG_INICIAL;	///@FIXME: assume que dados iniciais cabem em 200 bytes
 	sprintf(mensagem + sizeof(MSG_INICIAL) - 1, "%s\n%d clientes já conectados, %d atualmente, %d caronas dadas",
 				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
-	write(args->fd_con, mensagem, strlen(mensagem));
-	char credenciais[4 + 4 + 32];	// assinatura do app + # USP + hash sha-256
-	read(args->fd_con, credenciais, 32 + 4);
+	write(args->fd_con, mensagem, strlen(mensagem) + 1);
+	/*
+	 * O servidor recebe uma assinatura de 4 bytes (que é sempre a mesma) dos
+	 * clientes para provar que é nosso aplicativo que está conectado, o número
+	 * USP e o hash
+	 */
+	char credenciais[4 + 4 + 32];
+	read(args->fd_con, credenciais, sizeof(credenciais));
 	uint32_t assinatura = *((uint32_t *) credenciais), numero_usp = *((uint32_t *) credenciais + 1);
 	if (assinatura == SEQ_CLIENTE) {
 		if (numero_usp < NUMERO_TOTAL_USUARIOS) {
@@ -165,4 +172,3 @@ int main (int argc, char **argv) {
 		printf("%s conectado (fd = %d) total %d\n", ip, argumentos->fd_con, clientes_agora);
 	}
 }
-
