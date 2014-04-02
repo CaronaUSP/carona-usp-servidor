@@ -75,15 +75,16 @@ void* th_conecao_cliente(void *tmp) {
 	write(args->fd_con, mensagem, strlen(mensagem) + 1);
 	/*
 	 * O servidor recebe uma assinatura de 4 bytes (que é sempre a mesma) dos
-	 * clientes para provar que é nosso aplicativo que está conectado, o número
-	 * USP e o hash
+	 * clientes para provar que é nosso aplicativo que está conectado, versão do cliente,
+	 * o número USP e o hash
 	 */
-	char credenciais[4 + 4 + 32];
+	char credenciais[4 + 4 + 4 + SHA_256_DIGEST_LENGTH];
 	read(args->fd_con, credenciais, sizeof(credenciais));
-	uint32_t assinatura = *((uint32_t *) credenciais), numero_usp = *((uint32_t *) credenciais + 1);
+	uint32_t assinatura = *((uint32_t *) credenciais), numero_usp = *((uint32_t *) credenciais + 1), versao = *((uint32_t *) credenciais + 2);
+	char *hash_recebido = &credenciais[12];
 	if (assinatura == SEQ_CLIENTE) {
 		if (numero_usp < NUMERO_TOTAL_USUARIOS) {
-			if (senha_correta(numero_usp, mensagem, &credenciais[8])) {
+			if (senha_correta(numero_usp, mensagem, hash_recebido)) {
 				write(args->fd_con, "Aceito", 6);
 				printf("%d: autenticado\n", args->n_thread);
 			}
