@@ -1,0 +1,7 @@
+* Criar um diretório "local" no repositório (ele será ignorado pelo git)
+* Mudar para o diretório ("cd local")
+* Executar "gcc ../server.c -o server -Wall -Wextra -lpthread -lcrypto -g" para gerar o executável "server"
+* Requisitos: gcc, binutils, libssl-dev e outros (testem e adicionem aqui as outras dependências)
+
+* Rodar "./server [porta]" para rodar o servidor em dada porta
+* No emulador android, conectar-se com seu ip ou "localhost" ou 127.0.0.1 e porta
