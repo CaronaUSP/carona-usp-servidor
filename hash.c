@@ -68,6 +68,7 @@ int senha_correta (int usuario, const char *mensagem_autenticacao, const char *h
 	
 	hash_calculado[2 * SHA_256_DIGEST_LENGTH] = 0;
 	
-	printf("Hash: %s\n", hash_calculado);
-	return (!strcasecmp((char *) hash_calculado, hash_recebido));
+	printf("Hash calculado: %s\n", hash_calculado);
+	printf("Hash recebido: %.64s\n", hash_recebido);
+	return (!strncasecmp((char *) hash_calculado, hash_recebido, 2 * SHA_256_DIGEST_LENGTH));
 }

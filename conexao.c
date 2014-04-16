@@ -94,8 +94,8 @@ void* th_conecao_cliente(void *tmp) {
 		printf("Chave \"hash\" não encontrada\n");
 		pthread_exit(NULL);
 	}
-	if (hash.size != 32) {
-		printf("Hash != 32 bytes!\n");
+	if (hash.size != 64) {
+		printf("Hash != 64 bytes!\n");
 		pthread_exit(NULL);
 	}
 	
@@ -103,6 +103,7 @@ void* th_conecao_cliente(void *tmp) {
 	// Dados para login:
 	int nusp;
 	
+	// Calcula hash para usuário 0:
 	senha_correta(0, mensagem, hash.value);
 	
 	pthread_cleanup_pop(1);
