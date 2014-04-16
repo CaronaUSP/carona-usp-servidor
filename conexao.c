@@ -9,10 +9,13 @@
 *******************************************************************************/
 
 #include "conexao.h"
+#include "json.h"
 
 int s, clientes_agora = 0, clientes_total = 0, caronas_total = 0;
 uint32_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
-pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER, mutex_comunicacao = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t comunica_thread;
+
 
 inline int ja_conectado(const struct in_addr *ip) {
 	///@TODO: pode ser otimizado para buscar apenas conexões existentes na array?
@@ -50,35 +53,58 @@ void* th_limpeza(void *tmp) {
 	return NULL;
 }
 
+// Algumas constantes para facilitar o código
+// Envia pela thread atual:
+#define envia(msg, len)		envia_dados(args, msg, len)
+// Envia string pela thread atual:
+#define envia_str(str)		envia(str, strlen(str) + 1)
+// Envia variável com tamanho fixo pela thread atual:
+#define envia_fixo(objeto)	envia(objeto, sizeof(objeto))
+
+static inline void envia_dados(const args_thread *args, const void *buf, size_t count) {
+	th_try(write(args->fd_con, buf, count), "write");
+}
+
 void* th_conecao_cliente(void *tmp) {
-	args_thread *args = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
+	const args_thread *args = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
 								// então precisamos marcar o tipo de ponteiro recebido ou usar casts
+	int i;
 	pthread_cleanup_push((void *)th_limpeza, tmp);
 	printf("Thread criada, fd = %d\n", args->fd_con);
-	char mensagem[200] = MSG_INICIAL;	///@FIXME: assume que dados iniciais cabem em 200 bytes
-	sprintf(mensagem + sizeof(MSG_INICIAL) - 1, "%s\n%d clientes já conectados, %d atualmente, %d caronas dadas",
+	char mensagem[200];	///@FIXME: assume que dados iniciais cabem em 200 bytes
+	sprintf(mensagem, "{\"login\":\"Carona Comunitária USP\n%s\n%d clientes já conectados, %d atualmente, %d caronas dadas\"}""",
 				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
-	write(args->fd_con, mensagem, strlen(mensagem) + 1);
-	/*
-	 * O servidor recebe uma assinatura de 4 bytes (que é sempre a mesma) dos
-	 * clientes para provar que é nosso aplicativo que está conectado, versão do cliente,
-	 * o número USP e o hash
-	 */
-	char credenciais[4 + 4 + 4 + SHA_256_DIGEST_LENGTH];
-	read(args->fd_con, credenciais, sizeof(credenciais));
-	uint32_t assinatura = *((uint32_t *) credenciais), numero_usp = *((uint32_t *) credenciais + 1), versao = *((uint32_t *) credenciais + 2);
-	char *hash_recebido = &credenciais[12];
-	if (assinatura == SEQ_CLIENTE) {
-		if (numero_usp < NUMERO_TOTAL_USUARIOS) {
-			if (senha_correta(numero_usp, mensagem, hash_recebido)) {
-				write(args->fd_con, "Aceito", 6);
-				printf("%d: autenticado\n", args->n_thread);
-			}
-			else printf("%d: senha errada\n", args->n_thread);
-		} else
-			printf("%d: usuário %d inexistente\n", args->n_thread, numero_usp);
-	} else
-		printf("%d: assinatura errada\n", args->n_thread);
+	envia(mensagem, strlen(mensagem) + 1);
+	
+	char resposta[256];
+	///@FIXME: aceita mensagens até 256 bytes, senão as corta
+	int tamanho_leitura, n_tokens;
+	try(tamanho_leitura = read(args->fd_con, resposta, sizeof(resposta)), "read");
+	json_parser json;
+	json_value hash;
+	json.start = resposta;
+	json.size = sizeof(resposta);
+	
+	json_init(&json);
+	if (json_parse(&json) < 0) {
+		printf("Falha JSON parse\n");
+		pthread_exit(NULL);
+	}
+	if (json_get_str(&json, &hash, "hash") < 0) {
+		printf("Chave \"hash\" não encontrada\n");
+		pthread_exit(NULL);
+	}
+	if (hash.size != 32) {
+		printf("Hash != 32 bytes!\n");
+		pthread_exit(NULL);
+	}
+	
+	
+	// Dados para login:
+	int nusp;
+	
+	senha_correta(0, mensagem, hash.value);
+	
 	pthread_cleanup_pop(1);
 	return NULL;
 }

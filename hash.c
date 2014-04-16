@@ -9,7 +9,6 @@
 *******************************************************************************/
 
 #include "hash.h"
-#include <openssl/sha.h>
 
 // Senhas iniciais
 // As senhas são compiladas com o programa e estáticas (por enquanto)
@@ -49,11 +48,26 @@ const char passwords[2][32] = {
 
 int senha_correta (int usuario, const char *mensagem_autenticacao, const char *hash_recebido) {
 	// Ver man 3 sha
-	unsigned char hash_final[SHA_256_DIGEST_LENGTH];
-	SHA_CTX calcula_hash;
-	SHA1_Init(&calcula_hash);
-	SHA1_Update(&calcula_hash, mensagem_autenticacao, strlen(mensagem_autenticacao));
-	SHA1_Update(&calcula_hash, passwords[usuario], SHA_256_DIGEST_LENGTH);
-	SHA1_Final(hash_final, &calcula_hash);
-	return (!strncmp((char *) hash_final, hash_recebido, SHA_256_DIGEST_LENGTH));
+	unsigned char hash[SHA_256_DIGEST_LENGTH];
+	char hash_senha[2 * SHA_256_DIGEST_LENGTH], hash_calculado[2 * SHA_256_DIGEST_LENGTH + 1];
+	int i;
+	
+	for (i = 0; i < SHA_256_DIGEST_LENGTH; i++)
+		sprintf(hash_senha + 2 * i, "%.2hhX", (unsigned int) (passwords[i]));
+	
+	EVP_MD_CTX calcula_hash;
+	EVP_DigestInit(&calcula_hash, EVP_sha256());
+	EVP_DigestUpdate(&calcula_hash, mensagem_autenticacao, strlen(mensagem_autenticacao));
+	EVP_DigestUpdate(&calcula_hash, hash_senha, SHA_256_DIGEST_LENGTH * 2);
+	EVP_DigestFinal(&calcula_hash, hash, NULL);
+	
+	for (i = 0; i < SHA_256_DIGEST_LENGTH; i++) {
+		//printf("%X", (unsigned int) hash[i]);
+		sprintf(hash_calculado + 2 * i, "%.2hhX", (unsigned int) (hash[i]));
+	}
+	
+	hash_calculado[2 * SHA_256_DIGEST_LENGTH] = 0;
+	
+	printf("Hash: %s\n", hash_calculado);
+	return (!strcasecmp((char *) hash_calculado, hash_recebido));
 }

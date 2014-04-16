@@ -9,12 +9,15 @@
 ################################################################################
 
 CC=gcc
+#-Og
 DBG=-g
+OPTIMIZE=-O3
 LIB_PTHREADS=-lpthread
 LIB_CRYPTO=-lcrypto
 
 # Esses devem ser mudados para configurar a compilação como desejado
-# Flags para gerar objetos:
+# Flags para gerar objetos (usar OPTIMIZE no lugar de DBG ativa várias otimizações
+# e não inclui dados de depuração no executável):
 CFLAGS=-c -Wall -Wextra $(DBG)
 # Flags para o linker (adicione outras bibiliotecas, caso necessário):
 LDFLAGS=$(LIB_PTHREADS) $(LIB_CRYPTO)
@@ -26,7 +29,7 @@ GLOBALDEPS=global.h config.h
 TARGETS:=$(wildcard *.c)
 OBJECTS=$(patsubst %.c,%.o,$(TARGETS))
 # $< = prerequisito, $@ = alvo:
-COMPILE=$(CC) $< $(CFLAGS) -o $@
+COMPILE=$(CC) $(CFLAGS) $< -o $@
 LINK=$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
 RM=-rm -rf
 
@@ -49,6 +52,9 @@ $(EXECUTABLE): $(OBJECTS)
 # Caso você se esqueça de adicionar as dependências de um arquivo, há uma regra padrão
 # definida que gerará o arquivo usando como dependências seu .c, .h, e $(GLOBALDEPS) e
 # mostrando uma mensagem de aviso na compilação
+
+json.o: json.c json.h
+	$(COMPILE)
 
 hash.o: hash.c hash.h $(GLOBALDEPS)
 	$(COMPILE)

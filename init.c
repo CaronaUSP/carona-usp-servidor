@@ -11,7 +11,7 @@
 #include "init.h"
 
 // Se recebermos SIGINT, paramos o programa fechando as conexões.
-static void sig_handler(int __attribute__((unused)) signo) {
+void sig_handler(int __attribute__((unused)) signo) {
 		printf("I: Recebido SIGINT\n");
 		pthread_mutex_destroy(&mutex_modifica_thread);
 		///@TODO: atualizar .dados antes de fechar
@@ -62,4 +62,6 @@ void inicializa(int argc, char **argv) {
 	
 	// mutex para atualização de dados comuns às threads
 	pthread_mutex_init(&mutex_modifica_thread, NULL);
+	
+	pthread_cond_init(&comunica_thread, NULL);
 }

@@ -12,15 +12,10 @@
 #define __CONFIG_H__
 
 #define MAX_CLIENTES	200
-// Sequência inicial do cliente de 32 bits, para certificar que o cliente é
-// nosso aplicativo
-#define SEQ_CLIENTE		0x494c4f50
-// Primeira string enviada pelo servidor, usada como verificação inicial pelo
-// cliente de que estamos conectados no servidor correto
-#define MSG_INICIAL		"Carona Comunitária USP\n"
 // Mensagem de informação, deve mudar de tempos em tempos
 ///@TODO: não deve ser uma constante
 #define MSG_NOVIDADES	"Projeto de graduação para melhorar a mobilidade na USP!"
-#define MSG_LIMITE		MSG_INICIAL "Máximo de clientes atingido"
+
+#define MSG_ERR_COMUNICACAO	"{\"msg\":\"Falha na comunicação com o servidor\",\"fim\"}"
 
 #endif

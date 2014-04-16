@@ -5,18 +5,25 @@
  * Carona Comunitária USP is licensed under a Creative Commons
  * Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0).
  * 
- * Funções para controle de hashes
+ * Biblioteca para análise de pacotes JSON
 *******************************************************************************/
 
-#ifndef __HASH_H__
-#define __HASH_H__
+#include <stddef.h>
+#include <string.h>
+#define JSON_OK			0
+#define JSON_INVALID	-1
+#define JSON_INCOMPLETE	-2
 
-#include "global.h"
-#include <openssl/evp.h>
+typedef struct {
+	char *start, *cur, *cur_end;
+	size_t size;
+} json_parser;
 
-#define NUMERO_TOTAL_USUARIOS	(sizeof(passwords) / sizeof(passwords[0]))
+typedef struct {
+	char *value;
+	size_t size;
+} json_value;
 
-extern const char passwords[2][32];
-int senha_correta (int usuario, const char *mensagem_autenticacao, const char *hash_recebido);
-
-#endif
+void json_init(json_parser *json);
+int json_parse(json_parser *json);
+int json_get_str(json_parser *json, json_value *ret, const char *key);

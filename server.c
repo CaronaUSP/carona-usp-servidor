@@ -15,8 +15,7 @@ int main (int argc, char **argv) {
 	// Argumentos que serão enviados às threads
 	args_thread *argumentos = malloc(sizeof(args_thread));;
 	for (;;) {
-		///@TODO: limitar tentativas de login,
-		///checar timeouts/trajetos cíclicos/outros modos de quebrar o servidor
+		///@TODO: checar timeouts/trajetos cíclicos/outros modos de quebrar o servidor
 		struct sockaddr_in endereco_cliente;
 		for (;;) {
 			socklen_t clilen = sizeof(struct sockaddr_in);
@@ -25,10 +24,9 @@ int main (int argc, char **argv) {
 			if (clientes_agora < MAX_CLIENTES)
 				break;
 			// Se atingiu limite:
-			write(argumentos->fd_con, MSG_LIMITE, sizeof(MSG_LIMITE));
+			write(argumentos->fd_con, "{\"msg\":\"Número máximo de clientes atingido\",\"fim\"}", sizeof("{\"msg\":\"Número máximo de clientes atingido\",\"fim\"}"));
 			close(argumentos->fd_con);
 		}
-		///@TODO: salvar endereço do cliente para cada thread (pelo menos para ter um log)
 		char ip[16];	///@WARN: IPv6 usa mais que 16 caracteres! Editar se for utilizá-lo!
 		try0(inet_ntop(AF_INET, &endereco_cliente.sin_addr, ip, sizeof(ip) - 1), "inet_ntop");
 		printf("%s conectado (fd = %d), total %d\n", ip, argumentos->fd_con, clientes_agora + 1);
