@@ -13,10 +13,12 @@ int main (int argc, char **argv) {
 	inicializa(argc, argv);	// Inicialização e abertura de portas
 	
 	// Argumentos que serão enviados às threads
-	args_thread *argumentos = malloc(sizeof(args_thread));;
+	args_thread *argumentos;
 	for (;;) {
 		///@TODO: checar timeouts/trajetos cíclicos/outros modos de quebrar o servidor
 		struct sockaddr_in endereco_cliente;
+		// Aloca espaço para novos argumentos
+		try0(argumentos = malloc(sizeof(args_thread)), "malloc");
 		for (;;) {
 			socklen_t clilen = sizeof(struct sockaddr_in);
 			// Aceita conexão e salva fd nos argumentos para a thread
@@ -38,7 +40,5 @@ int main (int argc, char **argv) {
 		// Cria thread:
 		argumentos->n_thread = clientes_agora;
 		aceita_conexao(argumentos, &endereco_cliente.sin_addr);
-		// Aloca espaço para novos argumentos
-		argumentos = malloc(sizeof(args_thread));
 	}
 }

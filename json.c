@@ -8,19 +8,149 @@
  * Biblioteca para análise de pacotes JSON
 *******************************************************************************/
 
-
-// O código está bem básico e não suporta objetos dentro de objetos nem arrays.
-// Suporte completo a JSON será adicionado mais tarde.
-
-// Performance não está sendo levada em conta; a versão final do código deverá
-// ordenar os objetos por nome na inicialização (qsort é bom pra isso) e usar
-// busca binária em json_get.
-
 #include "json.h"
+
+static int cmp_json_pair(const void *p1, const void *p2) {	// ponteiros para json_pair
+	return strcmp( ( (json_pair const *) p1)->name, ( (json_pair const *) p2)->name);
+}
 
 void json_init(json_parser *json) {
 	json->cur = json->start;
 	json->cur_end = json->start + json->size - 1;
+}
+
+static int search_object(json_parser *json) {
+	for (; *json->cur; json->cur++) {
+		switch (*json->cur) {
+			case '{':
+				json->cur++;
+				return 0;
+			case '\t':
+			case '\r':
+			case '\n':
+			case ' ':
+				break;
+			default:
+				return JSON_INVALID;
+		}
+	}
+	return JSON_INCOMPLETE;
+}
+
+static char *json_getstr(json_parser *json) {
+	char *end, *p;
+	for (; *(json->cur); json->cur++) {
+		switch (*json->cur) {
+			case '\"':
+				if ((end = strchr(json->cur + 1, '\"')) == NULL)
+					return NULL;
+				if ((p = malloc(end - json->cur)) == NULL) {
+					perror("malloc");
+					return NULL;
+				}
+				memcpy(p, json->cur + 1, end - json->cur - 1);
+				p[end - json->cur - 1] = 0;
+				json->cur = end + 1;
+				return p;
+			case '\t':
+			case '\r':
+			case '\n':
+			case ' ':
+				break;
+			default:
+				return NULL;
+		}
+	}
+	return NULL;
+}
+
+
+static int json_next(json_parser *json) {	//1 = há mais dados antes do fim do objeto
+	for (; *json->cur; json->cur++) {
+		switch (*json->cur) {
+			case '}':
+				return 0;
+			case '\t':
+			case '\r':
+			case '\n':
+			case ' ':
+				break;
+			case ',':
+				json->cur++;
+				return 1;
+			default:
+				return JSON_INVALID;
+		}
+	}
+	return 1;
+}
+
+static char *json_get_value_str(json_parser *json) {
+	for (; *json->cur; json->cur++) {
+		switch (*json->cur) {
+			case ':':
+				json->cur++;
+				return json_getstr(json);
+			case '\t':
+			case '\r':
+			case '\n':
+			case ' ':
+				break;
+			default:
+				return NULL;
+		}
+	}
+	return NULL;
+}
+
+
+static void bp() {}	//para depuração
+#define try(cmd)	do {int __ret = (cmd); if (__ret < 0) return __ret;} while(0)
+#define try0(cmd)	do {if ((cmd) == NULL) return JSON_INVALID;} while(0)
+int json_all_parse(json_parser *json) {
+	try(search_object(json));
+	printf("JSON start = %d\n", json->cur - json->start);
+	///@TODO: checar objetos vazios
+	int obj_n = 0;
+	do {
+		char *str;
+		try0(str = json_getstr(json));
+		
+		char *value;
+		try0(value = json_get_value_str(json));
+		printf("String %s = \"%s\"\n", str, value);
+		
+		json->pairs[obj_n].name = str;
+		json->pairs[obj_n].type = JSON_STRING;
+		json->pairs[obj_n].value = value;
+		
+		obj_n++;
+	} while (json_next(json) == 1);
+	bp();
+	qsort(json->pairs, obj_n, sizeof(json_pair), cmp_json_pair);
+	
+	printf("Sorted:\n");
+	int i;
+	for (i=0; i < obj_n; i++) {
+		json_str *str = (json_str *) &json->pairs[i];
+		printf("%s = %s\n", str->name, str->value);
+	}
+	
+	json->n_pairs = obj_n;
+	return 0;
+}
+
+char *json_get_str(json_parser *json, const char *search) {
+	json_pair search_pair, *result;
+	search_pair.name = search;
+	search_pair.type = JSON_STRING;
+	search_pair.value = NULL;
+	
+	result = bsearch(&search_pair, json->pairs, json->n_pairs, sizeof(json_pair), cmp_json_pair);
+	if (result == NULL)
+		return NULL;
+	
+	return result->value;
 }
 
 int json_parse(json_parser *json) {
@@ -62,82 +192,4 @@ int json_parse(json_parser *json) {
 		}
 	}
 	return JSON_INCOMPLETE;
-}
-
-// json_get busca sempre na string inteira pela chave e não suporta arrays/objetos
-// em objetos.
-int json_get_str(json_parser *json, json_value *ret, const char *key) {
-	char *inicio = json->cur, *fim, *valor_fim;
-	size_t tamanho;
-	for (;;) {
-		for (; inicio <= json->cur_end; inicio++) {
-			switch (*inicio) {
-				case '\"':
-					goto inicio_chave;
-				case '\t':
-				case '\r':
-				case '\n':
-				case ' ':
-					break;
-				default:
-					return JSON_INVALID;
-			}
-		}
-		
-		inicio_chave:
-		inicio++;
-		if (inicio >= json->cur_end)
-			return JSON_INVALID;
-		
-		fim = inicio;
-		
-		for (; fim <= json->cur_end; fim++)
-			if (*fim == '\"')
-				break;
-		
-		if (fim == json->cur_end || fim == inicio)
-			return JSON_INVALID;
-		
-		tamanho = fim - inicio;
-		if (tamanho == strlen(key)) {
-			if (!strncmp(inicio, key, tamanho)) {	// chave encontrada
-				
-				ret->value = fim + 1;
-				for (; ret->value <= json->cur_end; ret->value++)
-					if (*(ret->value) == ':')
-						break;
-				
-				if (ret->value == json->cur_end)
-					return JSON_INVALID;
-				
-				for (; ret->value <= json->cur_end; ret->value++)
-					if (*(ret->value) == '\"')
-						break;
-				
-				ret->value++;
-				
-				if (ret->value >= json->cur_end)
-					return JSON_INVALID;
-				
-				valor_fim = ret->value;
-				
-				for (; valor_fim <= json->cur_end; valor_fim++)
-					if (*valor_fim == '\"')
-						break;
-				
-				if (valor_fim > json->cur_end)
-					return JSON_INVALID;
-				ret->size = valor_fim - ret->value;
-				return JSON_OK;
-			}
-		}
-		
-		for (; inicio <= json->cur_end; inicio++)
-			if (*inicio == ',')
-				break;
-		
-		if (inicio == json->cur_end)
-			return JSON_INVALID;
-		
-	}
 }

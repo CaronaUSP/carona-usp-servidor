@@ -53,7 +53,7 @@ int senha_correta (int usuario, const char *mensagem_autenticacao, const char *h
 	int i;
 	
 	for (i = 0; i < SHA_256_DIGEST_LENGTH; i++)
-		sprintf(hash_senha + 2 * i, "%.2hhX", (unsigned int) (passwords[i]));
+		sprintf(hash_senha + 2 * i, "%.2hhX", (unsigned int) (passwords[usuario][i]));
 	
 	EVP_MD_CTX calcula_hash;
 	EVP_DigestInit(&calcula_hash, EVP_sha256());

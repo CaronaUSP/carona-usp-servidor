@@ -5,7 +5,7 @@
  */
 
 #include <stdio.h>
-#include "json2.h"
+#include "json.h"
 
 int main () {
 	char str[200];

@@ -76,25 +76,25 @@ void* th_conecao_cliente(void *tmp) {
 				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
 	envia(mensagem, strlen(mensagem) + 1);
 	
-	char resposta[256];
+	char resposta[256], *hash;
 	///@FIXME: aceita mensagens até 256 bytes, senão as corta
 	int tamanho_leitura, n_tokens;
 	try(tamanho_leitura = read(args->fd_con, resposta, sizeof(resposta)), "read");
 	json_parser json;
-	json_value hash;
+	json_pair pairs[200];
 	json.start = resposta;
-	json.size = sizeof(resposta);
+	json.pairs = pairs;
 	
 	json_init(&json);
-	if (json_parse(&json) < 0) {
+	if (json_all_parse(&json) < 0) {
 		printf("Falha JSON parse\n");
 		pthread_exit(NULL);
 	}
-	if (json_get_str(&json, &hash, "hash") < 0) {
+	if ((hash = json_get_str(&json, "hash")) == NULL) {
 		printf("Chave \"hash\" não encontrada\n");
 		pthread_exit(NULL);
 	}
-	if (hash.size != 64) {
+	if (strlen(hash) != 64) {
 		printf("Hash != 64 bytes!\n");
 		pthread_exit(NULL);
 	}
@@ -104,7 +104,7 @@ void* th_conecao_cliente(void *tmp) {
 	int nusp;
 	
 	// Calcula hash para usuário 0:
-	senha_correta(0, mensagem, hash.value);
+	senha_correta(0, mensagem, hash);
 	
 	pthread_cleanup_pop(1);
 	return NULL;
