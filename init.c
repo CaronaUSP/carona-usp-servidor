@@ -11,13 +11,20 @@
 #include "init.h"
 
 // Se recebermos SIGINT, paramos o programa fechando as conexões.
-void sig_handler(int __attribute__((unused)) signo) {
+static void sig_handler(int __attribute__((unused)) signo) {
 		printf("I: Recebido SIGINT\n");
 		pthread_mutex_destroy(&mutex_modifica_thread);
 		///@TODO: atualizar .dados antes de fechar
 		close(s);
 		exit(0);
 }
+
+/*
+// A limpeza é feita em th_limpeza (conexao.c)
+static void thread_key_destroy(void *buf) {
+	free(buf);
+}
+*/
 
 void inicializa(int argc, char **argv) {
 	
@@ -64,4 +71,10 @@ void inicializa(int argc, char **argv) {
 	pthread_mutex_init(&mutex_modifica_thread, NULL);
 	
 	pthread_cond_init(&comunica_thread, NULL);
+	
+	// Cria TSD (thread specific area), regiões alocadas para cada thread para
+	// guardar variáveis da thread (se usássemos globais, haveria conflito entre
+	// as threads)
+	pthread_key_create(&dados_thread, NULL);
+	
 }

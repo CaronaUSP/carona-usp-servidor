@@ -37,8 +37,7 @@ typedef struct {
 } json_pair;
 
 typedef struct {
-	char *start, *cur, *cur_end;
-	size_t size;
+	char *start, *cur;
 	json_pair *pairs;
 	int n_pairs;
 } json_parser;
@@ -57,7 +56,7 @@ typedef struct {
 typedef struct {
 	char *name;
 	int type;
-	int *value;
+	int value;
 } json_int;
 
 typedef struct {

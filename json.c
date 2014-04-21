@@ -14,11 +14,6 @@ static int cmp_json_pair(const void *p1, const void *p2) {	// ponteiros para jso
 	return strcmp( ( (json_pair const *) p1)->name, ( (json_pair const *) p2)->name);
 }
 
-void json_init(json_parser *json) {
-	json->cur = json->start;
-	json->cur_end = json->start + json->size - 1;
-}
-
 static int search_object(json_parser *json) {
 	for (; *json->cur; json->cur++) {
 		switch (*json->cur) {
@@ -32,6 +27,23 @@ static int search_object(json_parser *json) {
 				break;
 			default:
 				return JSON_INVALID;
+		}
+	}
+	return JSON_INCOMPLETE;
+}
+
+static int is_empty(json_parser *json) {
+	for (; *json->cur; json->cur++) {
+		switch (*json->cur) {
+			case '}':
+				return 1;
+			case '\t':
+			case '\r':
+			case '\n':
+			case ' ':
+				break;
+			default:
+				return 0;
 		}
 	}
 	return JSON_INCOMPLETE;
@@ -85,55 +97,152 @@ static int json_next(json_parser *json) {	//1 = há mais dados antes do fim do o
 	return 1;
 }
 
-static char *json_get_value_str(json_parser *json) {
+static int json_get_value_start(json_parser *json) {
 	for (; *json->cur; json->cur++) {
 		switch (*json->cur) {
 			case ':':
 				json->cur++;
-				return json_getstr(json);
+				return JSON_OK;
 			case '\t':
 			case '\r':
 			case '\n':
 			case ' ':
 				break;
 			default:
-				return NULL;
+				return JSON_INVALID;
 		}
 	}
-	return NULL;
+	return JSON_INVALID;
 }
 
+
+static int json_get_value_int(json_parser *json) {
+	int num;
+	if (sscanf(json->cur, "%d", &num) == EOF) {
+		perror("sscanf");
+		return JSON_INVALID;	// isso precisa ser corrigido (um inteiro = -1 (mesmo valor de JSON_INVALID) não é diferenciado de erro)
+	}
+	
+	for (; *json->cur; json->cur++) {
+		switch (*json->cur) {
+			case '}':
+			case ',':
+			case '\t':
+			case '\r':
+			case '\n':
+			case ' ':
+			case '0': case '1': case '2': case '3': case '4': case '5':
+			case '6': case '7': case '8': case '9':
+				return num;
+			default:
+				return JSON_INVALID;
+		}
+	}
+	// Atingiu final do pacote sem achar fim do objeto:
+	return JSON_INVALID;
+}
+
+static int json_get_type(json_parser *json) {
+	json_get_value_start(json);
+	for (; *json->cur; json->cur++) {
+		switch (*json->cur) {
+			case '\"':
+				return JSON_STRING;
+			case 't':
+				if (strncmp(json->cur, "true", 4)) {
+					json->cur += 4;
+					return JSON_TRUE;
+				}
+				return JSON_INVALID;
+			case 'f':
+				if (strncmp(json->cur, "false", 5)) {
+					json->cur += 5;
+					return JSON_FALSE;
+				}
+				return JSON_INVALID;
+			case 'n':
+				if (strncmp(json->cur, "null", 4)) {
+					json->cur += 4;
+					return JSON_NULL;
+				}
+				return JSON_INVALID;
+			case '{':
+				return JSON_OBJECT;
+			case '[':
+				return JSON_ARRAY;
+			case '0': case '1': case '2': case '3': case '4': case '5':
+			case '6': case '7': case '8': case '9':
+				return JSON_NUMBER;
+			case '\t':
+			case '\r':
+			case '\n':
+			case ' ':
+				break;
+			default:
+				return JSON_INVALID;
+		}
+	}
+	return JSON_INVALID;
+}
 
 static void bp() {}	//para depuração
 #define try(cmd)	do {int __ret = (cmd); if (__ret < 0) return __ret;} while(0)
 #define try0(cmd)	do {if ((cmd) == NULL) return JSON_INVALID;} while(0)
 int json_all_parse(json_parser *json) {
+	json->cur = json->start;
 	try(search_object(json));
 	printf("JSON start = %d\n", json->cur - json->start);
-	///@TODO: checar objetos vazios
+	
 	int obj_n = 0;
-	do {
-		char *str;
-		try0(str = json_getstr(json));
-		
-		char *value;
-		try0(value = json_get_value_str(json));
-		printf("String %s = \"%s\"\n", str, value);
-		
-		json->pairs[obj_n].name = str;
-		json->pairs[obj_n].type = JSON_STRING;
-		json->pairs[obj_n].value = value;
-		
-		obj_n++;
-	} while (json_next(json) == 1);
+	int has_ended = is_empty(json);
+	if (has_ended == JSON_INCOMPLETE)
+		return JSON_INCOMPLETE;
+	
+	///@TODO: checar limite de json->pairs
+	
+	if (!has_ended)
+		do {
+			char *str;
+			try0(str = json_getstr(json));
+			
+			int type = json_get_type(json);
+			if (type == JSON_INVALID)
+				return JSON_INVALID;
+			
+			try(json_get_value_start);
+			
+			json->pairs[obj_n].name = str;
+			json->pairs[obj_n].type = type;
+			
+			
+			switch (type) {
+				case JSON_STRING:
+					try0(json->pairs[obj_n].value = json_getstr(json));
+					break;
+				case JSON_NUMBER:
+					printf("Recebido número, assumindo como inteiro (float ainda não é suportado!)\n");
+					try(((json_int *) json->pairs)[obj_n].value = json_get_value_int(json));
+					break;
+				default:
+					// Arrays e objetos não são suportados. true, false e null
+					// são, mas vou adicionar aqui mais tarde (quando formos utilizá-los)
+					printf("JSON: Tipo não suportado %d encontrado\n", type);
+			}
+			
+			obj_n++;
+		} while (json_next(json) == 1);
+	
 	bp();
 	qsort(json->pairs, obj_n, sizeof(json_pair), cmp_json_pair);
 	
 	printf("Sorted:\n");
 	int i;
 	for (i=0; i < obj_n; i++) {
-		json_str *str = (json_str *) &json->pairs[i];
-		printf("%s = %s\n", str->name, str->value);
+		printf("\"%s\" = \t", json->pairs[i].name);
+		if (json->pairs[i].type == JSON_STRING)
+			printf("\"%s\"\n", ((json_str *) json->pairs)[i].value);
+		else if (json->pairs[i].type == JSON_INT)
+			printf("%d\n", ((json_int *) json->pairs)[i].value);
 	}
 	
 	json->n_pairs = obj_n;
@@ -151,45 +260,4 @@ char *json_get_str(json_parser *json, const char *search) {
 		return NULL;
 	
 	return result->value;
-}
-
-int json_parse(json_parser *json) {
-	
-	// Linha suspeita:
-	memmove(json->start, json->cur_end + 1, json->size - (json->cur_end - json->start + 1));
-	for (; json->cur < json->start + json->size && *(json->cur) != '{'; json->cur++) {
-		switch (*(json->cur)) {
-			case '\t':
-			case '\r':
-			case '\n':
-			case ' ':
-				break;
-			default:
-				return JSON_INVALID;
-		}
-	}
-	
-	if (json->cur >= json->start + json->size) {
-		*(json->cur) = *(json->start);
-		return JSON_INCOMPLETE;
-	}
-	
-	int i_stack = 0;
-	json->cur++;
-	
-	for (json->cur_end = json->cur; json->cur_end < json->start + json->size; json->cur_end++) {
-		switch (*(json->cur_end)) {
-			case '{':
-				i_stack++;
-				break;
-			case '}':
-				if (i_stack == 0) {
-					json->cur_end--;
-					return JSON_OK;
-				}
-				i_stack--;
-				break;
-		}
-	}
-	return JSON_INCOMPLETE;
 }

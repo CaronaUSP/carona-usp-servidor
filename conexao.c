@@ -15,7 +15,7 @@ int s, clientes_agora = 0, clientes_total = 0, caronas_total = 0;
 uint32_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
 pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER, mutex_comunicacao = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t comunica_thread;
-
+pthread_key_t dados_thread;
 
 inline int ja_conectado(const struct in_addr *ip) {
 	///@TODO: pode ser otimizado para buscar apenas conexões existentes na array?
@@ -28,9 +28,9 @@ inline int ja_conectado(const struct in_addr *ip) {
 	return 0;
 }
 
-inline void aceita_conexao(args_thread *args, const struct in_addr *ip) {
+inline void aceita_conexao(tsd_t *tsd, const struct in_addr *ip) {
 	pthread_t thread;
-	pthread_create(&thread, NULL, th_conecao_cliente, args);	// free() de argumentos será pela thread
+	pthread_create(&thread, NULL, th_conecao_cliente, tsd);	// free() de argumentos será pela thread
 	pthread_detach(thread);			// não receber retorno e liberar recursos ao final da execução
 	
 	pthread_mutex_lock(&mutex_modifica_thread);
@@ -42,50 +42,50 @@ inline void aceita_conexao(args_thread *args, const struct in_addr *ip) {
 
 // Limpeza de recursos ao terminar thread
 void* th_limpeza(void *tmp) {
-	args_thread *args = tmp;
+	tsd_t *tsd = tmp;
 	pthread_mutex_lock(&mutex_modifica_thread);
 	clientes_agora--;
-	conectados[args->n_thread] = 0;
+	conectados[tsd->n_thread] = 0;
 	pthread_mutex_unlock(&mutex_modifica_thread);
-	printf("Thread %d: disconexão\n", args->n_thread);
-	close(args->fd_con);
-	free(args);
+	printf("Thread %d: disconexão\n", tsd->n_thread);
+	close(tsd->fd_con);
+	free(tsd);
 	return NULL;
 }
 
 // Algumas constantes para facilitar o código
 // Envia pela thread atual:
-#define envia(msg, len)		envia_dados(args, msg, len)
+#define envia(msg, len)		th_try(write(tsd->fd_con, msg, len), "write")
 // Envia string pela thread atual:
 #define envia_str(str)		envia(str, strlen(str) + 1)
 // Envia variável com tamanho fixo pela thread atual:
 #define envia_fixo(objeto)	envia(objeto, sizeof(objeto))
 
-static inline void envia_dados(const args_thread *args, const void *buf, size_t count) {
-	th_try(write(args->fd_con, buf, count), "write");
-}
-
 void* th_conecao_cliente(void *tmp) {
-	const args_thread *args = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
+	const tsd_t *tsd = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
 								// então precisamos marcar o tipo de ponteiro recebido ou usar casts
 	int i;
 	pthread_cleanup_push((void *)th_limpeza, tmp);
-	printf("Thread criada, fd = %d\n", args->fd_con);
+	printf("Thread criada, fd = %d\n", tsd->fd_con);
 	char mensagem[200];	///@FIXME: assume que dados iniciais cabem em 200 bytes
 	sprintf(mensagem, "{\"login\":\"Carona Comunitária USP\n%s\n%d clientes já conectados, %d atualmente, %d caronas dadas\"}""",
 				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
 	envia(mensagem, strlen(mensagem) + 1);
 	
-	char resposta[256], *hash;
-	///@FIXME: aceita mensagens até 256 bytes, senão as corta
-	int tamanho_leitura, n_tokens;
-	try(tamanho_leitura = read(args->fd_con, resposta, sizeof(resposta)), "read");
+	char resposta[1024], *hash;
+	///@FIXME: aceita mensagens até 1024 bytes, senão as corta
+	ssize_t tamanho_leitura;
+	int n_tokens;
+	try(tamanho_leitura = read(tsd->fd_con, resposta, sizeof(resposta)), "read");
+	
+	if (memchr(resposta, 0, tamanho_leitura) == NULL)		// certificar-se que a mensagem possui um byte nulo
+		pthread_exit(NULL);
+	
 	json_parser json;
 	json_pair pairs[200];
 	json.start = resposta;
 	json.pairs = pairs;
 	
-	json_init(&json);
 	if (json_all_parse(&json) < 0) {
 		printf("Falha JSON parse\n");
 		pthread_exit(NULL);
