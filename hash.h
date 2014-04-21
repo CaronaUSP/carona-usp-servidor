@@ -16,7 +16,6 @@
 
 #define NUMERO_TOTAL_USUARIOS	(sizeof(passwords) / sizeof(passwords[0]))
 
-extern const char passwords[2][32];
-int senha_correta (int usuario, const char *mensagem_autenticacao, const char *hash_recebido);
+int senha_correta (const char *usuario, const char *mensagem_autenticacao, const char *hash_recebido);
 
 #endif

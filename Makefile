@@ -28,6 +28,7 @@ GLOBALDEPS=global.h config.h
 
 TARGETS:=$(wildcard *.c)
 OBJECTS=$(patsubst %.c,%.o,$(TARGETS))
+ALL_OBJECTS:=$(wildcard *.o)
 # $< = prerequisito, $@ = alvo:
 COMPILE=$(CC) $(CFLAGS) $< -o $@
 LINK=$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
@@ -76,4 +77,4 @@ server.o: server.c server.h conexao.o init.o $(GLOBALDEPS)
 	$(COMPILE)
 
 clean:
-	$(RM) $(OBJECTS) $(EXECUTABLE)
+	$(RM) $(ALL_OBJECTS) $(EXECUTABLE)

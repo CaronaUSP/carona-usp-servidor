@@ -64,7 +64,6 @@ void* th_limpeza(void *tmp) {
 void* th_conecao_cliente(void *tmp) {
 	const tsd_t *tsd = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
 								// então precisamos marcar o tipo de ponteiro recebido ou usar casts
-	int i;
 	pthread_cleanup_push((void *)th_limpeza, tmp);
 	printf("Thread criada, fd = %d\n", tsd->fd_con);
 	char mensagem[200];	///@FIXME: assume que dados iniciais cabem em 200 bytes
@@ -72,10 +71,9 @@ void* th_conecao_cliente(void *tmp) {
 				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
 	envia(mensagem, strlen(mensagem) + 1);
 	
-	char resposta[1024], *hash;
+	char resposta[1024], *hash, *usuario;
 	///@FIXME: aceita mensagens até 1024 bytes, senão as corta
 	ssize_t tamanho_leitura;
-	int n_tokens;
 	try(tamanho_leitura = read(tsd->fd_con, resposta, sizeof(resposta)), "read");
 	
 	if (memchr(resposta, 0, tamanho_leitura) == NULL)		// certificar-se que a mensagem possui um byte nulo
@@ -98,13 +96,24 @@ void* th_conecao_cliente(void *tmp) {
 		printf("Hash != 64 bytes!\n");
 		pthread_exit(NULL);
 	}
+	bp();
+	usuario = json_get_str(&json, "usuario");
 	
+	if (usuario == NULL) {
+		printf("Chave \"usuario\" não encontrada\n");
+		pthread_exit(NULL);
+	}
 	
-	// Dados para login:
-	int nusp;
+	// Usuário é, por enquanto, ignorado no cálculo do hash (ver hash.c).
+	// Hash da senha é "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"
+	// para qualquer usuário enviado.
 	
-	// Calcula hash para usuário 0:
-	senha_correta(0, mensagem, hash);
+	sprintf(mensagem, "Carona Comunitária USP\n%s\n%d clientes já conectados, %d atualmente, %d caronas dadas",
+				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
+	if (senha_correta(usuario, mensagem, hash))
+		printf("Autenticado!\n");
+	else
+		printf("Falha de autenticação\n");
 	
 	pthread_cleanup_pop(1);
 	return NULL;

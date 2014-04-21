@@ -15,6 +15,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+
 #define JSON_OK			0
 #define JSON_INVALID	-1
 #define JSON_INCOMPLETE	-2
@@ -71,8 +72,7 @@ typedef struct {
 } json_value;
 
 void json_init(json_parser *json);
-int json_parse(json_parser *json);
 char *json_get_str(json_parser *json, const char *search);
 int json_all_parse(json_parser *json);
-
+int json_get_int(json_parser *json, const char *search);
 #endif

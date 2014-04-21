@@ -131,9 +131,10 @@ static int json_get_value_int(json_parser *json) {
 			case '\r':
 			case '\n':
 			case ' ':
+				return num;
 			case '0': case '1': case '2': case '3': case '4': case '5':
 			case '6': case '7': case '8': case '9':
-				return num;
+				break;
 			default:
 				return JSON_INVALID;
 		}
@@ -185,7 +186,7 @@ static int json_get_type(json_parser *json) {
 	return JSON_INVALID;
 }
 
-static void bp() {}	//para depuração
+void bp() {}	//para depuração
 #define try(cmd)	do {int __ret = (cmd); if (__ret < 0) return __ret;} while(0)
 #define try0(cmd)	do {if ((cmd) == NULL) return JSON_INVALID;} while(0)
 int json_all_parse(json_parser *json) {
@@ -209,19 +210,18 @@ int json_all_parse(json_parser *json) {
 			if (type == JSON_INVALID)
 				return JSON_INVALID;
 			
-			try(json_get_value_start);
-			
 			json->pairs[obj_n].name = str;
 			json->pairs[obj_n].type = type;
 			
 			
 			switch (type) {
+				// Seria melhor e mais organizado ter uma array para cada tipo
 				case JSON_STRING:
 					try0(json->pairs[obj_n].value = json_getstr(json));
 					break;
 				case JSON_NUMBER:
 					printf("Recebido número, assumindo como inteiro (float ainda não é suportado!)\n");
-					try(((json_int *) json->pairs)[obj_n].value = json_get_value_int(json));
+					try((*(json_int *) &json->pairs[obj_n]).value = json_get_value_int(json));
 					break;
 				default:
 					// Arrays e objetos não são suportados. true, false e null
@@ -249,15 +249,31 @@ int json_all_parse(json_parser *json) {
 	return 0;
 }
 
-char *json_get_str(json_parser *json, const char *search) {
+void *json_get(json_parser *json, const char *search, int type) {
 	json_pair search_pair, *result;
 	search_pair.name = search;
-	search_pair.type = JSON_STRING;
-	search_pair.value = NULL;
 	
 	result = bsearch(&search_pair, json->pairs, json->n_pairs, sizeof(json_pair), cmp_json_pair);
+	
 	if (result == NULL)
 		return NULL;
 	
-	return result->value;
+	if (result->type == type)
+		return &result->value;
+	
+	return NULL;
+}
+
+char *json_get_str(json_parser *json, const char *search) {
+	if (json_get(json, search, JSON_STRING) == NULL)
+		return NULL;
+	return *((char **)json_get(json, search, JSON_STRING));
+}
+
+
+int json_get_int(json_parser *json, const char *search) {
+	char *n = json_get(json, search, JSON_INT);
+	if (n  == NULL)
+		return JSON_INVALID;
+	return *((int *) n);
 }

@@ -10,20 +10,6 @@
 
 #include "hash.h"
 
-// Senhas iniciais
-// As senhas são compiladas com o programa e estáticas (por enquanto)
-// Hashes sha-256 de ("Hashes - Carona Comunitária USP (CC BY-NC-SA 4.0) " + senha)
-
-const char passwords[2][32] = {
-	//Senha: 01
-	{0x67, 0x47, 0xdc, 0x33, 0x37, 0xab, 0x9e, 0x02, 0x1b, 0x66, 0x8a, 0x94, 0xce, 0xf9, 0x04, 0xbb,
-	0xda, 0x3e, 0x1b, 0x85, 0x15, 0xd4, 0x75, 0x05, 0x74, 0x7a, 0x27, 0x14, 0xb0, 0x0d, 0x5a, 0xef},
-	
-	//Senha: 02
-	{0x05, 0x9f, 0xa7, 0xaa, 0x12, 0x58, 0x12, 0xfc, 0xee, 0x9a, 0x43, 0xad, 0xd4, 0x50, 0x6c, 0xc4,
-	0xd7, 0x39, 0xc6, 0xb0, 0x40, 0x93, 0xb9, 0x3e, 0x56, 0x63, 0x75, 0x22, 0xb3, 0xef, 0xc4, 0x2c},
-};
-
 /*
  * Esta função checa se o hash retornado pelo cliente bate com o esperado.
  * 
@@ -46,14 +32,12 @@ const char passwords[2][32] = {
  * E compara os dois
  */
 
-int senha_correta (int usuario, const char *mensagem_autenticacao, const char *hash_recebido) {
+int senha_correta (const char *usuario, const char *mensagem_autenticacao, const char *hash_recebido) {
 	// Ver man 3 sha
 	unsigned char hash[SHA_256_DIGEST_LENGTH];
-	char hash_senha[2 * SHA_256_DIGEST_LENGTH], hash_calculado[2 * SHA_256_DIGEST_LENGTH + 1];
+	char hash_senha[2 * SHA_256_DIGEST_LENGTH] = "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF",
+		hash_calculado[2 * SHA_256_DIGEST_LENGTH + 1];
 	int i;
-	
-	for (i = 0; i < SHA_256_DIGEST_LENGTH; i++)
-		sprintf(hash_senha + 2 * i, "%.2hhX", (unsigned int) (passwords[usuario][i]));
 	
 	EVP_MD_CTX calcula_hash;
 	EVP_DigestInit(&calcula_hash, EVP_sha256());
