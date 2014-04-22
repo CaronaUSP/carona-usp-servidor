@@ -19,6 +19,7 @@
 #define JSON_OK			0
 #define JSON_INVALID	-1
 #define JSON_INCOMPLETE	-2
+#define JSON_NOMEM		-3
 
 #define JSON_FALSE		0
 #define JSON_TRUE		1

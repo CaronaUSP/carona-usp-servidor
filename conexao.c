@@ -12,13 +12,13 @@
 #include "json.h"
 
 int s, clientes_agora = 0, clientes_total = 0, caronas_total = 0;
+int caminhos[MAX_CLIENTES][10];
 uint32_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
 pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER, mutex_comunicacao = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t comunica_thread;
 pthread_key_t dados_thread;
 
 inline int ja_conectado(const struct in_addr *ip) {
-	///@TODO: pode ser otimizado para buscar apenas conexões existentes na array?
 	int i;
 	for (i = 0; i < MAX_CLIENTES; i++) {
 		if (conectados[i] == *(uint32_t *)ip) {
@@ -83,6 +83,7 @@ void* th_conecao_cliente(void *tmp) {
 	json_pair pairs[200];
 	json.start = resposta;
 	json.pairs = pairs;
+	json.n_pairs = 200;
 	
 	if (json_all_parse(&json) < 0) {
 		printf("Falha JSON parse\n");
@@ -96,7 +97,7 @@ void* th_conecao_cliente(void *tmp) {
 		printf("Hash != 64 bytes!\n");
 		pthread_exit(NULL);
 	}
-	bp();
+	
 	usuario = json_get_str(&json, "usuario");
 	
 	if (usuario == NULL) {

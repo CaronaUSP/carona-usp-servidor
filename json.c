@@ -56,12 +56,8 @@ static char *json_getstr(json_parser *json) {
 			case '\"':
 				if ((end = strchr(json->cur + 1, '\"')) == NULL)
 					return NULL;
-				if ((p = malloc(end - json->cur)) == NULL) {
-					perror("malloc");
-					return NULL;
-				}
-				memcpy(p, json->cur + 1, end - json->cur - 1);
-				p[end - json->cur - 1] = 0;
+				*end = 0;
+				p = json->cur + 1;
 				json->cur = end + 1;
 				return p;
 			case '\t':
@@ -203,6 +199,10 @@ int json_all_parse(json_parser *json) {
 	
 	if (!has_ended)
 		do {
+			
+			if (obj_n >= json->n_pairs)
+				return JSON_NOMEM;	// Faltam entradas em json->pairs
+			
 			char *str;
 			try0(str = json_getstr(json));
 			
@@ -230,7 +230,7 @@ int json_all_parse(json_parser *json) {
 			}
 			
 			obj_n++;
-		} while (json_next(json) == 1);
+		} while (json_next(json) == 1 && obj_n < json->n_pairs);
 	
 	bp();
 	qsort(json->pairs, obj_n, sizeof(json_pair), cmp_json_pair);
