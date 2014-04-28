@@ -146,19 +146,19 @@ static int json_get_type(json_parser *json) {
 			case '\"':
 				return JSON_STRING;
 			case 't':
-				if (strncmp(json->cur, "true", 4)) {
+				if (!strncmp(json->cur, "true", 4)) {
 					json->cur += 4;
 					return JSON_TRUE;
 				}
 				return JSON_INVALID;
 			case 'f':
-				if (strncmp(json->cur, "false", 5)) {
+				if (!strncmp(json->cur, "false", 5)) {
 					json->cur += 5;
 					return JSON_FALSE;
 				}
 				return JSON_INVALID;
 			case 'n':
-				if (strncmp(json->cur, "null", 4)) {
+				if (!strncmp(json->cur, "null", 4)) {
 					json->cur += 4;
 					return JSON_NULL;
 				}
@@ -225,9 +225,17 @@ int json_all_parse(json_parser *json) {
 					/// retornar um ponteiro para a String com o número e usar sscanf em json_get_int
 					try((*(json_int *) &json->pairs[obj_n]).value = json_get_value_int(json));
 					break;
+				case JSON_TRUE:
+					json->pairs[obj_n].type = JSON_TRUE;
+					break;
+				case JSON_FALSE:
+					json->pairs[obj_n].type = JSON_FALSE;
+					break;
+				case JSON_NULL:
+					json->pairs[obj_n].type = JSON_NULL;
+					break;
 				default:
-					// Arrays e objetos não são suportados. true, false e null
-					// são, mas vou adicionar aqui mais tarde (quando formos utilizá-los)
+					// Arrays e objetos não são suportados ainda.
 					printf("JSON: Tipo não suportado %d encontrado\n", type);
 			}
 			
@@ -241,17 +249,32 @@ int json_all_parse(json_parser *json) {
 	int i;
 	for (i=0; i < obj_n; i++) {
 		printf("\"%s\" = \t", json->pairs[i].name);
-		if (json->pairs[i].type == JSON_STRING)
-			printf("\"%s\"\n", ((json_str *) json->pairs)[i].value);
-		else if (json->pairs[i].type == JSON_INT)
-			printf("%d\n", ((json_int *) json->pairs)[i].value);
+		switch (json->pairs[i].type) {
+			case  JSON_STRING:
+				printf("\"%s\"\n", ((json_str *) json->pairs)[i].value);
+				break;
+			case JSON_INT:
+				printf("%d\n", ((json_int *) json->pairs)[i].value);
+				break;
+			case JSON_TRUE:
+				printf("true\n");
+				break;
+			case JSON_FALSE:
+				printf("false\n");
+				break;
+			case JSON_NULL:
+				printf("null\n");
+				break;
+			default:
+				printf("Tipo desconhecido %d\n", json->pairs[i].type);
+		}
 	}
 	
 	json->n_pairs = obj_n;
 	return 0;
 }
 
-void *json_get(json_parser *json, const char *search, int type) {
+json_pair *json_get(json_parser *json, const char *search, int type) {
 	json_pair search_pair, *result;
 	search_pair.name = search;
 	
@@ -261,21 +284,32 @@ void *json_get(json_parser *json, const char *search, int type) {
 		return NULL;
 	
 	if (result->type == type)
-		return &result->value;
+		return result;
 	
 	return NULL;
 }
 
 char *json_get_str(json_parser *json, const char *search) {
-	if (json_get(json, search, JSON_STRING) == NULL)
+	json_pair *result;
+	if ((result =json_get(json, search, JSON_STRING)) == NULL)
 		return NULL;
-	return *((char **)json_get(json, search, JSON_STRING));
+	return result->value;
 }
 
 
 int json_get_int(json_parser *json, const char *search) {
-	char *n = json_get(json, search, JSON_INT);
-	if (n  == NULL)
+	json_pair *result = json_get(json, search, JSON_INT);
+	if (result  == NULL)
 		return JSON_INVALID;
-	return *((int *) n);
+	return ((int) result->value);
+}
+
+int json_get_bool(json_parser *json, const char *search) {
+	///@TODO: melhorar a interface (sem duas buscas aqui)
+	/// talvez definir um tipo JSON_BOOL?
+	if (json_get(json, search, JSON_TRUE)  != NULL)
+		return 1;
+	if (json_get(json, search, JSON_FALSE))
+		return 0;
+	return JSON_INVALID;
 }

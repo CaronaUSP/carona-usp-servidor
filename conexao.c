@@ -12,7 +12,7 @@
 #include "json.h"
 
 int s, clientes_agora = 0, clientes_total = 0, caronas_total = 0;
-int caminhos[MAX_CLIENTES][10];
+int caminhos[MAX_CLIENTES][3];
 uint32_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
 pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER, mutex_comunicacao = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t comunica_thread;

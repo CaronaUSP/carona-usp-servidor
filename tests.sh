@@ -52,4 +52,4 @@ echo "Hash calculado: ${hash}"
 echo -en "{ \"hash\" : \"$hash\", \"usuario\" : \"teste\" }\0" | nc $IP $PORTA
 
 # Segundo pacote: objeto com inteiros e strings para testar interpretação JSON do servidor
-echo -en '{ "hash" : "158256c9ac946fba45ca4868bc5b501deaf234ff6fcee73402222e503d4585a7", "a" : "sadfjsdahfsdafjgsdk", "str":"a", "inteiro" : 12345, "nusp" : 1, "abobora" : 2, "usuario" : "teste" } \0' | nc $IP $PORTA
+echo -en '{ "hash" : "158256c9ac946fba45ca4868bc5b501deaf234ff6fcee73402222e503d4585a7", "a" : "sadfjsdahfsdafjgsdk", "str":"a", "inteiro" : 12345, "nusp" : 1, "abobora" : 2, "usuario" : "teste", "verdadeiro" : true, "falso" : false, "nulo" : null } \0' | nc $IP $PORTA
