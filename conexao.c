@@ -60,10 +60,60 @@ void* th_limpeza(void *tmp) {
 #define envia_str(str)		envia(str, strlen(str) + 1)
 // Envia variável com tamanho fixo pela thread atual:
 #define envia_fixo(objeto)	envia(objeto, sizeof(objeto))
+#define finaliza(msg)		do{tsd->errmsg = msg; pthread_exit(NULL);}while(0)
+
+/*******************************************************************************
+ * char *leitura(leitura_t *leitura);
+ * Retorna ponteiro para próximo pacote JSON (busca após byte nulo, que
+ * representa o fim do atual
+ ******************************************************************************/
+ ///@TODO: Preciso testar isso direito
+char *leitura(leitura_t *l) {
+	char *prox_msg;
+	
+	tsd_t *tsd = pthread_getspecific(dados_thread);
+	
+	if (tsd == NULL) {
+		// Erro bem improvável (a chave foi inicializada em init.c), mas é bom tratá-lo aqui
+	}
+	
+	// Se já temos a próxima mensagem JSON completa nesse pacote
+	if ((prox_msg = memchr(&l->area[l->fim_json_atual], 0, l->fim_pacote - l->fim_json_atual)) != NULL) {
+		// Atualizamos o fim do pacote
+		l->fim_json_atual = prox_msg - l->area + 1;
+		// Retornamos a próxima msg
+		return prox_msg;
+	}
+	
+	// Senão, copiamos o início do pacote desejado para o início do buffer e lemos até completar l->tamanho_max bytes
+	l->fim_pacote -= l->fim_json_atual;
+	memmove(l->area, &l->area[l->fim_json_atual], l->fim_pacote);
+	// fim_json_atual = 0
+	
+	
+	int bytes_lidos;
+	for (;;) {
+		bytes_lidos = read(tsd->fd_con, l->area + l->fim_pacote - l->fim_json_atual, l->tamanho_max - (l->fim_pacote - l->fim_json_atual));
+		
+		if (bytes_lidos <= 0)
+			finaliza("{\"msg\":\"Leitura vazia\",\"fim\"}");
+		
+		l->fim_pacote += bytes_lidos;
+		
+		if ((prox_msg = memchr(&l->area[l->fim_json_atual], 0, l->fim_pacote - l->fim_json_atual)) != NULL) {
+			// Atualizamos o fim do pacote
+			l->fim_json_atual = prox_msg - l->area;
+			// Retornamos a próxima msg
+			return prox_msg;
+		}
+	}
+}
 
 void* th_conecao_cliente(void *tmp) {
 	const tsd_t *tsd = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
 								// então precisamos marcar o tipo de ponteiro recebido ou usar casts
+	leitura_t l;
+	pthread_setspecific(dados_thread, tmp);
 	pthread_cleanup_push((void *)th_limpeza, tmp);
 	printf("Thread criada, fd = %d\n", tsd->fd_con);
 	char mensagem[200];	///@FIXME: assume que dados iniciais cabem em 200 bytes
@@ -72,12 +122,14 @@ void* th_conecao_cliente(void *tmp) {
 	envia(mensagem, strlen(mensagem) + 1);
 	
 	char resposta[1024], *hash, *usuario;
-	///@FIXME: aceita mensagens até 1024 bytes, senão as corta
-	ssize_t tamanho_leitura;
-	try(tamanho_leitura = read(tsd->fd_con, resposta, sizeof(resposta)), "read");
 	
-	if (memchr(resposta, 0, tamanho_leitura) == NULL)		// certificar-se que a mensagem possui um byte nulo
-		pthread_exit(NULL);
+	///@FIXME: aceita mensagens até 1024 bytes, senão as corta
+	l.area = resposta;
+	l.fim_json_atual = 0;
+	l.fim_pacote = 0;
+	l.tamanho_max = sizeof(resposta);
+	
+	leitura(&l);
 	
 	json_parser json;
 	json_pair pairs[200];

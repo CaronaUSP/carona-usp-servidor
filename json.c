@@ -221,6 +221,8 @@ int json_all_parse(json_parser *json) {
 					break;
 				case JSON_NUMBER:
 					printf("Recebido número, assumindo como inteiro (float ainda não é suportado!)\n");
+					///@FIXME: um hack bem feio com casts. Funciona, mas uma forma melhor e mais bonita será
+					/// retornar um ponteiro para a String com o número e usar sscanf em json_get_int
 					try((*(json_int *) &json->pairs[obj_n]).value = json_get_value_int(json));
 					break;
 				default:

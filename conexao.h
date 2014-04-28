@@ -34,8 +34,14 @@ extern pthread_key_t dados_thread;
 typedef struct {
 	int fd_con;		// file descriptor da conexão
 	int n_thread;	// número da thread
+	char *errmsg;
 } tsd_t;
 
+typedef struct {
+	char *area;
+	// Fim do último JSON que retornamos, do pacote TCP e tamanho máx. do buffer
+	size_t fim_json_atual, fim_pacote, tamanho_max;
+} leitura_t;
 
 inline int ja_conectado(const struct in_addr *ip);
 inline void aceita_conexao(tsd_t *tsd, const struct in_addr *ip);

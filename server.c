@@ -18,6 +18,7 @@ int main (int argc, char **argv) {
 		struct sockaddr_in endereco_cliente;
 		// Aloca espaço para novos argumentos
 		try0(argumentos = malloc(sizeof(tsd_t)), "malloc");
+		argumentos->errmsg = NULL;		// mensagem de erro inicial = nenhuma
 		for (;;) {
 			socklen_t clilen = sizeof(struct sockaddr_in);
 			// Aceita conexão e salva fd nos argumentos para a thread
