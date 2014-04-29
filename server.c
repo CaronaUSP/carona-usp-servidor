@@ -32,13 +32,14 @@ int main (int argc, char **argv) {
 		char ip[16];	///@WARN: IPv6 usa mais que 16 caracteres! Editar se for utilizá-lo!
 		try0(inet_ntop(AF_INET, &endereco_cliente.sin_addr, ip, sizeof(ip) - 1), "inet_ntop");
 		printf("%s conectado (fd = %d), total %d\n", ip, argumentos->fd_con, clientes_agora + 1);
+		#ifndef NAO_CHECA_JA_CONECTADO
 		if (ja_conectado(&endereco_cliente.sin_addr)) {
 			printf("Já estava conectado, recusando\n");
 			close(argumentos->fd_con);
 			continue;
 		}
+		#endif
 		// Cria thread:
-		argumentos->n_thread = clientes_agora;
 		aceita_conexao(argumentos, &endereco_cliente.sin_addr);
 	}
 }

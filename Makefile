@@ -18,7 +18,7 @@ LIB_CRYPTO=-lcrypto
 # Esses devem ser mudados para configurar a compilação como desejado
 # Flags para gerar objetos (usar OPTIMIZE no lugar de DBG ativa várias otimizações
 # e não inclui dados de depuração no executável):
-CFLAGS=-c -Wall -Wextra $(DBG)
+CFLAGS=-c -Wall -Wextra $(DBG) -DNAO_CHECA_JA_CONECTADO
 # Flags para o linker (adicione outras bibiliotecas, caso necessário):
 LDFLAGS=$(LIB_PTHREADS) $(LIB_CRYPTO)
 # Nome do executável a ser gerado:

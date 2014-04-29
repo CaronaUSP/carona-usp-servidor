@@ -77,6 +77,7 @@ static int json_next(json_parser *json) {	//1 = há mais dados antes do fim do o
 	for (; *json->cur; json->cur++) {
 		switch (*json->cur) {
 			case '}':
+				*json->cur = 0;	// Ver json_get_int()
 				return 0;
 			case '\t':
 			case '\r':
@@ -84,13 +85,14 @@ static int json_next(json_parser *json) {	//1 = há mais dados antes do fim do o
 			case ' ':
 				break;
 			case ',':
+				*json->cur = 0;	// Ver json_get_int()
 				json->cur++;
 				return 1;
 			default:
 				return JSON_INVALID;
 		}
 	}
-	return 1;
+	return JSON_INVALID;
 }
 
 static int json_get_value_start(json_parser *json) {
@@ -112,22 +114,21 @@ static int json_get_value_start(json_parser *json) {
 }
 
 
-static int json_get_value_int(json_parser *json) {
-	int num;
-	if (sscanf(json->cur, "%d", &num) == EOF) {
-		perror("sscanf");
-		return JSON_INVALID;	// isso precisa ser corrigido (um inteiro = -1 (mesmo valor de JSON_INVALID) não é diferenciado de erro)
-	}
+static int json_parse_int(json_parser *json) {
 	
 	for (; *json->cur; json->cur++) {
 		switch (*json->cur) {
-			case '}':
-			case ',':
 			case '\t':
 			case '\r':
 			case '\n':
 			case ' ':
-				return num;
+				*json->cur = 0;
+				json->cur++;
+			// '}' e ',' serão usadas por json_next() para encontrar o fim do objeto/item,
+			// então não vamos colocá-los como 0 aqui:
+			case '}':
+			case ',':
+				return 0;
 			case '0': case '1': case '2': case '3': case '4': case '5':
 			case '6': case '7': case '8': case '9':
 				break;
@@ -188,16 +189,14 @@ void bp() {}	//para depuração
 int json_all_parse(json_parser *json) {
 	json->cur = json->start;
 	try(search_object(json));
-	printf("JSON start = %d\n", json->cur - json->start);
 	
 	int obj_n = 0;
 	int has_ended = is_empty(json);
 	if (has_ended == JSON_INCOMPLETE)
 		return JSON_INCOMPLETE;
 	
-	///@TODO: checar limite de json->pairs
-	
-	if (!has_ended)
+	if (!has_ended) {
+		int has_next;
 		do {
 			
 			if (obj_n >= json->n_pairs)
@@ -221,9 +220,8 @@ int json_all_parse(json_parser *json) {
 					break;
 				case JSON_NUMBER:
 					printf("Recebido número, assumindo como inteiro (float ainda não é suportado!)\n");
-					///@FIXME: um hack bem feio com casts. Funciona, mas uma forma melhor e mais bonita será
-					/// retornar um ponteiro para a String com o número e usar sscanf em json_get_int
-					try((*(json_int *) &json->pairs[obj_n]).value = json_get_value_int(json));
+					json->pairs[obj_n].value = json->cur;
+					try(json_parse_int(json));
 					break;
 				case JSON_TRUE:
 					json->pairs[obj_n].type = JSON_TRUE;
@@ -240,7 +238,11 @@ int json_all_parse(json_parser *json) {
 			}
 			
 			obj_n++;
-		} while (json_next(json) == 1 && obj_n < json->n_pairs);
+			has_next = json_next(json);
+			if (has_next == JSON_INVALID)
+				return JSON_INVALID;
+		} while (has_next == 1 && obj_n < json->n_pairs);
+	}
 	
 	bp();
 	qsort(json->pairs, obj_n, sizeof(json_pair), cmp_json_pair);
@@ -251,10 +253,10 @@ int json_all_parse(json_parser *json) {
 		printf("\"%s\" = \t", json->pairs[i].name);
 		switch (json->pairs[i].type) {
 			case  JSON_STRING:
-				printf("\"%s\"\n", ((json_str *) json->pairs)[i].value);
+				printf("\"%s\"\n", json->pairs[i].value);
 				break;
 			case JSON_INT:
-				printf("%d\n", ((json_int *) json->pairs)[i].value);
+				printf("%s\n", json->pairs[i].value);
 				break;
 			case JSON_TRUE:
 				printf("true\n");
@@ -299,9 +301,11 @@ char *json_get_str(json_parser *json, const char *search) {
 
 int json_get_int(json_parser *json, const char *search) {
 	json_pair *result = json_get(json, search, JSON_INT);
+	int n;
 	if (result  == NULL)
 		return JSON_INVALID;
-	return ((int) result->value);
+	sscanf(result->value, "%d", &n);
+	return n;
 }
 
 int json_get_bool(json_parser *json, const char *search) {
@@ -309,7 +313,7 @@ int json_get_bool(json_parser *json, const char *search) {
 	/// talvez definir um tipo JSON_BOOL?
 	if (json_get(json, search, JSON_TRUE)  != NULL)
 		return 1;
-	if (json_get(json, search, JSON_FALSE))
+	if (json_get(json, search, JSON_FALSE) != NULL)
 		return 0;
 	return JSON_INVALID;
 }

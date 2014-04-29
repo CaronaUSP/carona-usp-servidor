@@ -17,7 +17,11 @@ uint32_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
 pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER, mutex_comunicacao = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t comunica_thread;
 pthread_key_t dados_thread;
+int pilha_threads_livres[MAX_CLIENTES];
+pthread_t threads[MAX_CLIENTES];
+char *usuario_da_carona;
 
+#ifndef NAO_CHECA_JA_CONECTADO
 inline int ja_conectado(const struct in_addr *ip) {
 	int i;
 	for (i = 0; i < MAX_CLIENTES; i++) {
@@ -27,30 +31,19 @@ inline int ja_conectado(const struct in_addr *ip) {
 	}
 	return 0;
 }
+#endif
 
 inline void aceita_conexao(tsd_t *tsd, const struct in_addr *ip) {
-	pthread_t thread;
-	pthread_create(&thread, NULL, th_conecao_cliente, tsd);	// free() de argumentos será pela thread
-	pthread_detach(thread);			// não receber retorno e liberar recursos ao final da execução
 	
 	pthread_mutex_lock(&mutex_modifica_thread);
+	tsd->n_thread = pilha_threads_livres[clientes_agora];
 	conectados[clientes_agora] = *(uint32_t *)ip;
 	clientes_agora++;
-	pthread_mutex_unlock(&mutex_modifica_thread);
 	clientes_total++;
-}
-
-// Limpeza de recursos ao terminar thread
-void* th_limpeza(void *tmp) {
-	tsd_t *tsd = tmp;
-	pthread_mutex_lock(&mutex_modifica_thread);
-	clientes_agora--;
-	conectados[tsd->n_thread] = 0;
 	pthread_mutex_unlock(&mutex_modifica_thread);
-	printf("Thread %d: disconexão\n", tsd->n_thread);
-	close(tsd->fd_con);
-	free(tsd);
-	return NULL;
+	
+	pthread_create(&threads[tsd->n_thread], NULL, th_conecao_cliente, tsd);	// free() de argumentos será pela thread
+	pthread_detach(threads[tsd->n_thread]);			// não receber retorno e liberar recursos ao final da execução
 }
 
 // Algumas constantes para facilitar o código
@@ -60,7 +53,21 @@ void* th_limpeza(void *tmp) {
 #define envia_str(str)		envia(str, strlen(str) + 1)
 // Envia variável com tamanho fixo pela thread atual:
 #define envia_fixo(objeto)	envia(objeto, sizeof(objeto))
-#define finaliza(msg)		do{tsd->errmsg = msg; pthread_exit(NULL);}while(0)
+#define finaliza(msg)		do{envia_str(msg); pthread_exit(NULL);}while(0)
+
+// Limpeza de recursos ao terminar thread
+void* th_limpeza(void *tmp) {
+	tsd_t *tsd = tmp;
+	pthread_mutex_lock(&mutex_modifica_thread);
+	clientes_agora--;
+	conectados[tsd->n_thread] = 0;
+	pilha_threads_livres[clientes_agora] = tsd->n_thread;
+	pthread_mutex_unlock(&mutex_modifica_thread);
+	printf("Thread %d: disconexão\n", tsd->n_thread);
+	close(tsd->fd_con);
+	free(tsd);
+	return NULL;
+}
 
 /*******************************************************************************
  * char *leitura(leitura_t *leitura);
@@ -110,15 +117,17 @@ char *leitura(leitura_t *l) {
 }
 
 void* th_conecao_cliente(void *tmp) {
-	const tsd_t *tsd = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
+	tsd_t *tsd = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
 								// então precisamos marcar o tipo de ponteiro recebido ou usar casts
 	leitura_t l;
 	pthread_setspecific(dados_thread, tmp);
 	pthread_cleanup_push((void *)th_limpeza, tmp);
 	printf("Thread criada, fd = %d\n", tsd->fd_con);
-	char mensagem[200];	///@FIXME: assume que dados iniciais cabem em 200 bytes
+	char mensagem[1000];	///@FIXME: assume que dados cabem em 1000 bytes
+	pthread_mutex_lock(&mutex_modifica_thread);
 	sprintf(mensagem, "{\"login\":\"Carona Comunitária USP\n%s\n%d clientes já conectados, %d atualmente, %d caronas dadas\"}""",
 				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
+	pthread_mutex_unlock(&mutex_modifica_thread);
 	envia(mensagem, strlen(mensagem) + 1);
 	
 	char resposta[1024], *hash, *usuario;
@@ -163,10 +172,54 @@ void* th_conecao_cliente(void *tmp) {
 	
 	sprintf(mensagem, "Carona Comunitária USP\n%s\n%d clientes já conectados, %d atualmente, %d caronas dadas",
 				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
-	if (senha_correta(usuario, mensagem, hash))
-		printf("Autenticado!\n");
-	else
+	
+	if (senha_correta(usuario, mensagem, hash) == 0) {
 		printf("Falha de autenticação\n");
+		finaliza("{\"msg\":\"Falha de autenticação\",\"fim\"}");
+	}
+	
+	int da_carona = json_get_bool(&json, "da_carona");
+	
+	if (da_carona == JSON_INVALID) {
+		printf("Valor \"da_carona\" não encontrado\n");
+		finaliza("{\"msg\":\"Valor \\\"da_carona\\\" não encontrado\",\"fim\"}");
+	}
+	
+	if (da_carona) {
+		// Bem básico e para dois clientes (um dando e um recebendo carona)
+		// Será substituido por arrays mais tarde
+		int ponto1, ponto2, ponto3;
+		if ((ponto1 = json_get_int(&json, "ponto1")) == JSON_INVALID)
+			finaliza("{\"msg\":\"Mensagem faltando pontos para percorrer\",\"fim\"}");
+		if ((ponto2 = json_get_int(&json, "ponto2")) == JSON_INVALID)
+			finaliza("{\"msg\":\"Mensagem faltando pontos para percorrer\",\"fim\"}");
+		caminhos[0][0] = ponto1;
+		caminhos[0][1] = ponto2;
+		if ((ponto3 = json_get_int(&json, "ponto3")) != JSON_INVALID)
+			caminhos[0][2] = ponto3;
+		usuario_da_carona = usuario;
+		pthread_cond_signal(&comunica_thread);
+	} else {
+		int inicio, fim;
+		if ((inicio = json_get_int(&json, "inicio")) == JSON_INVALID)
+			finaliza("{\"msg\":\"Mensagem faltando ponto inicial\",\"fim\"}");
+		if ((fim = json_get_int(&json, "fim")) == JSON_INVALID)
+			finaliza("{\"msg\":\"Mensagem faltando ponto final\",\"fim\"}");
+		pthread_mutex_lock(&mutex_comunicacao);
+		pthread_cond_wait(&comunica_thread, &mutex_comunicacao);
+		printf("Cruzando usuários...\n");
+		int i, j;
+		for (i = 0; i < 3; i++) {
+			if (caminhos[0][i] == inicio)
+				for (j = i + 1; j < 3; j++) {
+					if (caminhos[0][j] == fim) {
+						sprintf(mensagem, "{\"msg\":\"Usuário %s dará carona! Trajeto %d, %d, %d\"}",
+							usuario_da_carona, caminhos[0][0], caminhos[0][1], caminhos[0][2]);
+						finaliza(mensagem);
+					}
+				}
+		}
+	}
 	
 	pthread_cleanup_pop(1);
 	return NULL;

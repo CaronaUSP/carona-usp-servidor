@@ -27,6 +27,7 @@ extern uint32_t conectados[MAX_CLIENTES];	// lista de IPs já conectados
 extern pthread_mutex_t mutex_modifica_thread;
 extern pthread_cond_t comunica_thread;
 extern pthread_key_t dados_thread;
+extern int pilha_threads_livres[MAX_CLIENTES];
 
 // Thread Specific Data Area - regiões alocadas para cada thread para
 // guardar variáveis da thread (se usássemos globais, haveria conflito entre

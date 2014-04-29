@@ -67,6 +67,12 @@ void inicializa(int argc, char **argv) {
 	sinal.sa_handler = sig_handler;
 	try(sigaction(SIGINT, &sinal, NULL), "sigaction");
 	
+	// pilha com threads livres
+	int i;
+	for (i = 0; i < MAX_CLIENTES; i++) {
+		pilha_threads_livres[i] = i;
+	}
+	
 	// mutex para atualização de dados comuns às threads
 	pthread_mutex_init(&mutex_modifica_thread, NULL);
 	
