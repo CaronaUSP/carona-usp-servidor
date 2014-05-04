@@ -102,10 +102,13 @@ char *leitura(leitura_t *l) {
 	
 	int bytes_lidos;
 	for (;;) {
-		bytes_lidos = read(tsd->fd_con, l->fim_pacote, l->tamanho_area - (l->fim_pacote - l->area));
+		bytes_lidos = read(tsd->fd_con, l->fim_pacote + 1, l->tamanho_area - (l->fim_pacote + 1 - l->area));
 		
-		if (bytes_lidos <= 0)
+		if (bytes_lidos <= 0) {
+			if (bytes_lidos == -1)
+				perror("leitura: read");
 			finaliza("{\"msg\":\"Leitura vazia\",\"fim\"}");
+		}
 		
 		l->fim_pacote += bytes_lidos;
 		
@@ -136,12 +139,10 @@ void* th_conecao_cliente(void *tmp) {
 	
 	///@FIXME: aceita mensagens até 1024 bytes, senão as corta
 	l.area = resposta;
-	l.fim_pacote = resposta;
-	l.fim_msg = resposta;
+	l.fim_pacote = resposta - 1;
+	l.fim_msg = resposta - 1;
 	l.tamanho_area = sizeof(resposta);
-	
-	for(;;)
-		printf("%s\n", leitura(&l));
+	leitura(&l);
 	
 	json_parser json;
 	json_pair pairs[200];

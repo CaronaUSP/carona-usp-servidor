@@ -14,4 +14,4 @@ if [ -z "$IP" ]; then
 fi
 
 # Terceiro pacote: objeto com inteiros e strings para testar interpretação JSON do servidor
-echo -en '{ "hash" : "158256c9ac946fba45ca4868bc5b501deaf234ff6fcee73402222e503d4585a7", "a" : "sadfjsdahfsdafjgsdk", "str":"a", "inteiro" : 12345, "nusp" : 1, "abobora" : 2, "usuario" : "teste", "verdadeiro" : true, "falso" : false, "nulo" : null } \0' | nc $IP $PORTA
+echo -en '{ "hash" : "158256c9ac946fba45ca4868bc5b501deaf234ff6fcee73402222e503d4585a7", "a" : "sadfjsdahfsdafjgsdk", "str":"a", "inteiro" : 12345, "nusp" : 1, "abobora" : 2, "usuario" : "teste", "verdadeiro" : true, "falso" : false, "nulo" : null, "array" : [1, 2, 3, 4, 5, 6, 7, "oi", "foo", "bar"] } \0' | nc $IP $PORTA

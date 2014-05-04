@@ -189,7 +189,7 @@ static int json_get_type(json_parser *json) {
  * Busca fim de uma array
  */
 int json_array_end(json_parser *json) {
-	int n_aberturas = 1;	// número de colchetes ('[') que foram abertos
+	int n_aberturas = 0;	// número de colchetes ('[') que foram abertos
 	
 	for (; *json->cur; json->cur++) {
 		switch (*json->cur) {
@@ -294,7 +294,7 @@ int json_all_parse(json_parser *json) {
 				printf("null\n");
 				break;
 			case JSON_ARRAY:
-				printf("array \"%s\"\n", json->pairs[i].value);
+				printf("array [%s]\n", json->pairs[i].value);
 				break;
 			default:
 				printf("Tipo desconhecido %d\n", json->pairs[i].type);
