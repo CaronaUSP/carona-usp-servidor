@@ -15,7 +15,7 @@ int s, clientes_agora = 0, clientes_total = 0, caronas_total = 0;
 int caminhos[MAX_CLIENTES][3];
 uint32_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
 pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER, mutex_comunicacao = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t comunica_thread;
+pthread_cond_t comunica_thread;//[MAX_CLIENTES];
 pthread_key_t dados_thread;
 int pilha_threads_livres[MAX_CLIENTES];
 pthread_t threads[MAX_CLIENTES];
@@ -76,42 +76,44 @@ void* th_limpeza(void *tmp) {
  ******************************************************************************/
  ///@TODO: Preciso testar isso direito
 char *leitura(leitura_t *l) {
-	char *prox_msg;
+	char *busca_nulo, *ret;
 	
 	tsd_t *tsd = pthread_getspecific(dados_thread);
 	
 	if (tsd == NULL) {
 		// Erro bem improvável (a chave foi inicializada em init.c), mas é bom tratá-lo aqui
+		printf("leitura: tsd não encontrada\n");
+		finaliza("{\"msg\":\"leitura(): TSD não encontrada\nIsso é um bug, reporte-o!!!\",\"fim\"}");
 	}
 	
 	// Se já temos a próxima mensagem JSON completa nesse pacote
-	if ((prox_msg = memchr(&l->area[l->fim_json_atual], 0, l->fim_pacote - l->fim_json_atual)) != NULL) {
+	if ((busca_nulo = memchr(l->fim_msg + 1, 0, l->fim_pacote - l->fim_msg)) != NULL) {
+		ret = l->fim_msg + 1;
 		// Atualizamos o fim do pacote
-		l->fim_json_atual = prox_msg - l->area + 1;
+		l->fim_msg = busca_nulo;
 		// Retornamos a próxima msg
-		return prox_msg;
+		return ret;
 	}
 	
 	// Senão, copiamos o início do pacote desejado para o início do buffer e lemos até completar l->tamanho_max bytes
-	l->fim_pacote -= l->fim_json_atual;
-	memmove(l->area, &l->area[l->fim_json_atual], l->fim_pacote);
-	// fim_json_atual = 0
+	l->fim_pacote -= l->fim_msg - l->area + 1;
+	memmove(l->area, l->fim_msg + 1, l->fim_msg - l->area + 1);
 	
 	
 	int bytes_lidos;
 	for (;;) {
-		bytes_lidos = read(tsd->fd_con, l->area + l->fim_pacote - l->fim_json_atual, l->tamanho_max - (l->fim_pacote - l->fim_json_atual));
+		bytes_lidos = read(tsd->fd_con, l->fim_pacote, l->tamanho_area - (l->fim_pacote - l->area));
 		
 		if (bytes_lidos <= 0)
 			finaliza("{\"msg\":\"Leitura vazia\",\"fim\"}");
 		
 		l->fim_pacote += bytes_lidos;
 		
-		if ((prox_msg = memchr(&l->area[l->fim_json_atual], 0, l->fim_pacote - l->fim_json_atual)) != NULL) {
-			// Atualizamos o fim do pacote
-			l->fim_json_atual = prox_msg - l->area;
+		if ((busca_nulo = memchr(l->fim_msg	 + 1, 0, l->fim_pacote - l->fim_msg)) != NULL) {
+			// Atualizamos o fim da mensagem JSON
+			l->fim_msg = busca_nulo;
 			// Retornamos a próxima msg
-			return prox_msg;
+			return l->area;
 		}
 	}
 }
@@ -134,11 +136,12 @@ void* th_conecao_cliente(void *tmp) {
 	
 	///@FIXME: aceita mensagens até 1024 bytes, senão as corta
 	l.area = resposta;
-	l.fim_json_atual = 0;
-	l.fim_pacote = 0;
-	l.tamanho_max = sizeof(resposta);
+	l.fim_pacote = resposta;
+	l.fim_msg = resposta;
+	l.tamanho_area = sizeof(resposta);
 	
-	leitura(&l);
+	for(;;)
+		printf("%s\n", leitura(&l));
 	
 	json_parser json;
 	json_pair pairs[200];

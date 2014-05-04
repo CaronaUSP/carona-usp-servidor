@@ -122,13 +122,15 @@ static int json_parse_int(json_parser *json) {
 			case '\r':
 			case '\n':
 			case ' ':
-				*json->cur = 0;
-				json->cur++;
+				*json->cur = 0;	// Fim do número, coloca caractere nulo
+				json->cur++;	// Próxima função começará acessos do próximo byte
 			// '}' e ',' serão usadas por json_next() para encontrar o fim do objeto/item,
 			// então não vamos colocá-los como 0 aqui:
+			///@TODO: Isso é um pouco confuso (ler aqui, colocar o caractere nulo em outra função),
+			/// melhor mudar isso alguma hora (mas funciona bem, então vou deixar assim por enquanto)
 			case '}':
 			case ',':
-				return 0;
+				return 0;		// Sucesso!
 			case '0': case '1': case '2': case '3': case '4': case '5':
 			case '6': case '7': case '8': case '9':
 				break;
@@ -183,6 +185,31 @@ static int json_get_type(json_parser *json) {
 	return JSON_INVALID;
 }
 
+/*
+ * Busca fim de uma array
+ */
+int json_array_end(json_parser *json) {
+	int n_aberturas = 1;	// número de colchetes ('[') que foram abertos
+	
+	for (; *json->cur; json->cur++) {
+		switch (*json->cur) {
+			case '[':
+				n_aberturas++;
+				break;
+			case ']':
+				n_aberturas--;
+				if (n_aberturas == 0) {
+					*json->cur = 0;
+					json->cur++;
+					return 0;
+				}
+		}
+	}
+	// Atingiu final do pacote sem achar fim da array:
+	return JSON_INVALID;
+	
+}
+
 void bp() {}	//para depuração
 #define try(cmd)	do {int __ret = (cmd); if (__ret < 0) return __ret;} while(0)
 #define try0(cmd)	do {if ((cmd) == NULL) return JSON_INVALID;} while(0)
@@ -205,15 +232,9 @@ int json_all_parse(json_parser *json) {
 			char *str;
 			try0(str = json_getstr(json));
 			
-			int type = json_get_type(json);
-			if (type == JSON_INVALID)
-				return JSON_INVALID;
+			int type;
 			
-			json->pairs[obj_n].name = str;
-			json->pairs[obj_n].type = type;
-			
-			
-			switch (type) {
+			switch (type = json_get_type(json)) {
 				// Seria melhor e mais organizado ter uma array para cada tipo
 				case JSON_STRING:
 					try0(json->pairs[obj_n].value = json_getstr(json));
@@ -224,18 +245,23 @@ int json_all_parse(json_parser *json) {
 					try(json_parse_int(json));
 					break;
 				case JSON_TRUE:
-					json->pairs[obj_n].type = JSON_TRUE;
-					break;
 				case JSON_FALSE:
-					json->pairs[obj_n].type = JSON_FALSE;
-					break;
 				case JSON_NULL:
-					json->pairs[obj_n].type = JSON_NULL;
+					break;
+				case JSON_OBJECT:
+					///@TODO: suportar objetos (não é importante agora)
+					printf("JSON: Objetos não suportados!\n");
+					return JSON_INVALID;
+				case JSON_ARRAY:
+					json->pairs[obj_n].value = json->cur + 1;
+					try(json_array_end(json));
 					break;
 				default:
-					// Arrays e objetos não são suportados ainda.
-					printf("JSON: Tipo não suportado %d encontrado\n", type);
+					printf("JSON: json_get_type: tipo %d desconhecido\n", type);
 			}
+			
+			json->pairs[obj_n].name = str;
+			json->pairs[obj_n].type = type;
 			
 			obj_n++;
 			has_next = json_next(json);
@@ -266,6 +292,9 @@ int json_all_parse(json_parser *json) {
 				break;
 			case JSON_NULL:
 				printf("null\n");
+				break;
+			case JSON_ARRAY:
+				printf("array \"%s\"\n", json->pairs[i].value);
 				break;
 			default:
 				printf("Tipo desconhecido %d\n", json->pairs[i].type);
@@ -303,7 +332,8 @@ int json_get_int(json_parser *json, const char *search) {
 	json_pair *result = json_get(json, search, JSON_INT);
 	int n;
 	if (result  == NULL)
-		return JSON_INVALID;
+		return JSON_INVALID;	///@TODO: Isso precisa ser arrumado (-1 não poderá ser lido pois retornará o mesmo que JSON_INVALID),
+								/// mas não é importante agora
 	sscanf(result->value, "%d", &n);
 	return n;
 }

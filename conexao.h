@@ -39,9 +39,10 @@ typedef struct {
 } tsd_t;
 
 typedef struct {
-	char *area;
-	// Fim do último JSON que retornamos, do pacote TCP e tamanho máx. do buffer
-	size_t fim_json_atual, fim_pacote, tamanho_max;
+	// Início do buffer de leitura, fim da mensagem atual, fim do pacote atual
+	// e tamanho máximo do buffer
+	char *area, *fim_msg, *fim_pacote;
+	size_t tamanho_area;
 } leitura_t;
 
 inline int ja_conectado(const struct in_addr *ip);
