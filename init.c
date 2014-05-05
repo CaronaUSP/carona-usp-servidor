@@ -71,12 +71,13 @@ void inicializa(int argc, char **argv) {
 	int i;
 	for (i = 0; i < MAX_CLIENTES; i++) {
 		pilha_threads_livres[i] = i;
+		pthread_cond_init(&comunica_thread[i], NULL);
+		pthread_mutex_init(&mutex_comunicacao[i], NULL);
 	}
 	
 	// mutex para atualização de dados comuns às threads
 	pthread_mutex_init(&mutex_modifica_thread, NULL);
 	
-	pthread_cond_init(&comunica_thread, NULL);
 	
 	// Cria TSD (thread specific area), regiões alocadas para cada thread para
 	// guardar variáveis da thread (se usássemos globais, haveria conflito entre

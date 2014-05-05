@@ -347,3 +347,40 @@ int json_get_bool(json_parser *json, const char *search) {
 		return 0;
 	return JSON_INVALID;
 }
+
+char *json_get_array(json_parser *json, const char *search) {
+	json_pair *result;
+	if ((result =json_get(json, search, JSON_ARRAY)) == NULL)
+		return NULL;
+	return result->value;
+}
+
+/*
+ * Pega item n da array
+ */
+///@TODO: função bem simples, falha em arrays ou objetos dentro de arrays.
+/// Mas usamos apenas arrays de inteiros no servidor, então não faz diferença
+int json_array_i(char *array, int n) {
+	int i, ret;
+	for (i = 0; i < n; i++) {
+		if ((array = strchr(array, ',')) == NULL)
+			return JSON_INVALID;	///@TODO: Isso precisa ser arrumado (-1 não poderá ser lido pois retornará o mesmo que JSON_INVALID),
+									/// mas não é importante agora
+	}
+	for (; *array; array++) {
+		switch (*array) {
+			case '0': case '1': case '2': case '3': case '4': case '5':
+			case '6': case '7': case '8': case '9':
+				sscanf(array, "%d", &ret);
+				return ret;
+			case '\t':
+			case '\r':
+			case '\n':
+			case ' ':
+				break;
+			default:
+				return JSON_INVALID;
+		}
+	}
+	return JSON_INVALID;
+}

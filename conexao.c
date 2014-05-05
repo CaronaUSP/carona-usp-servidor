@@ -14,8 +14,8 @@
 int s, clientes_agora = 0, clientes_total = 0, caronas_total = 0;
 int caminhos[MAX_CLIENTES][3];
 uint32_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
-pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER, mutex_comunicacao = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t comunica_thread;//[MAX_CLIENTES];
+pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER, mutex_comunicacao[MAX_CLIENTES] = {PTHREAD_MUTEX_INITIALIZER};
+pthread_cond_t comunica_thread[MAX_CLIENTES];
 pthread_key_t dados_thread;
 int pilha_threads_livres[MAX_CLIENTES];
 pthread_t threads[MAX_CLIENTES];
@@ -127,12 +127,16 @@ void* th_conecao_cliente(void *tmp) {
 	leitura_t l;
 	pthread_setspecific(dados_thread, tmp);
 	pthread_cleanup_push((void *)th_limpeza, tmp);
-	printf("Thread criada, fd = %d\n", tsd->fd_con);
+	printf("Thread criada, fd = %d, n = %d\n", tsd->fd_con, tsd->n_thread);
+	char str_hash[500];
 	char mensagem[1000];	///@FIXME: assume que dados cabem em 1000 bytes
+	
 	pthread_mutex_lock(&mutex_modifica_thread);
-	sprintf(mensagem, "{\"login\":\"Carona Comunitária USP\n%s\n%d clientes já conectados, %d atualmente, %d caronas dadas\"}""",
+	sprintf(str_hash, "Carona Comunitária USP\n%s\n%d clientes já conectados, %d atualmente, %d caronas dadas",
 				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
 	pthread_mutex_unlock(&mutex_modifica_thread);
+	
+	sprintf(mensagem, "{\"login\":\"%s\"}""", str_hash);
 	envia(mensagem, strlen(mensagem) + 1);
 	
 	char resposta[1024], *hash, *usuario;
@@ -174,25 +178,21 @@ void* th_conecao_cliente(void *tmp) {
 	// Hash da senha é "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"
 	// para qualquer usuário enviado.
 	
-	sprintf(mensagem, "Carona Comunitária USP\n%s\n%d clientes já conectados, %d atualmente, %d caronas dadas",
-				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
-	
-	if (senha_correta(usuario, mensagem, hash) == 0) {
+	if (senha_correta(usuario, str_hash, hash) == 0) {
 		printf("Falha de autenticação\n");
 		finaliza("{\"msg\":\"Falha de autenticação\",\"fim\"}");
 	}
 	
-	int da_carona = json_get_bool(&json, "da_carona");
-	
-	if (da_carona == JSON_INVALID) {
-		printf("Valor \"da_carona\" não encontrado\n");
-		finaliza("{\"msg\":\"Valor \\\"da_carona\\\" não encontrado\",\"fim\"}");
+	leitura(&l);
+	if (json_all_parse(&json) < 0) {
+		printf("Falha JSON parse\n");
+		pthread_exit(NULL);
 	}
 	
-	if (da_carona) {
-		// Bem básico e para dois clientes (um dando e um recebendo carona)
-		// Será substituido por arrays mais tarde
-		int ponto1, ponto2, ponto3;
+	char *pontos = json_get_array(&json, "pontos");
+	
+	if (pontos != NULL) {
+		/*
 		if ((ponto1 = json_get_int(&json, "ponto1")) == JSON_INVALID)
 			finaliza("{\"msg\":\"Mensagem faltando pontos para percorrer\",\"fim\"}");
 		if ((ponto2 = json_get_int(&json, "ponto2")) == JSON_INVALID)
@@ -202,16 +202,19 @@ void* th_conecao_cliente(void *tmp) {
 		if ((ponto3 = json_get_int(&json, "ponto3")) != JSON_INVALID)
 			caminhos[0][2] = ponto3;
 		usuario_da_carona = usuario;
-		pthread_cond_signal(&comunica_thread);
+		*/
+		#error("Código a ser feito")
+		pthread_mutex_lock(&mutex_comunicacao[tsd->n_thread]);
+		pthread_cond_wait(&comunica_thread[tsd->n_thread], &mutex_comunicacao[tsd->n_thread]);
+		
 	} else {
 		int inicio, fim;
 		if ((inicio = json_get_int(&json, "inicio")) == JSON_INVALID)
 			finaliza("{\"msg\":\"Mensagem faltando ponto inicial\",\"fim\"}");
 		if ((fim = json_get_int(&json, "fim")) == JSON_INVALID)
 			finaliza("{\"msg\":\"Mensagem faltando ponto final\",\"fim\"}");
-		pthread_mutex_lock(&mutex_comunicacao);
-		pthread_cond_wait(&comunica_thread, &mutex_comunicacao);
 		printf("Cruzando usuários...\n");
+		/*
 		int i, j;
 		for (i = 0; i < 3; i++) {
 			if (caminhos[0][i] == inicio)
@@ -223,6 +226,11 @@ void* th_conecao_cliente(void *tmp) {
 					}
 				}
 		}
+		*/
+		#error("Código a ser feito")
+		pthread_mutex_lock(&mutex_comunicacao[tsd->n_thread]);
+		pthread_cond_signal(&comunica_thread[tsd->n_thread]);
+		pthread_mutex_unlock(&mutex_comunicacao[tsd->n_thread]);
 	}
 	
 	pthread_cleanup_pop(1);
