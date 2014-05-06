@@ -1,25 +1,29 @@
-/*
- * Em desenvolvimento!
- */
 #include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+#define error(msg)		do {perror(msg); exit(1);} while(0)
+#define try(cmd, msg) 	do {if ((cmd) == -1) {error(msg);}} while(0)
+
+char buf[2000] = {0}, *p = buf;
+int s;	//socket
 
 // Se recebermos SIGINT, enviamos um novo pacote:
 static void sig_handler(int __attribute__((unused)) signo) {
 		printf("I: Recebido SIGINT\n");
-		
+		try(write(s, buf, strlen(buf) + 1), "write");
+		p = buf;
 }
 
 
 int main(int argc, char **argv) {
 	
-	if (argc != 2) {	// o programa espera um argumento (porta TCP para abrir)
-		fprintf(stderr, "Uso: %s porta\n", argv[0]);
-		exit(1);
-	}
-	
-	uint16_t porta;
-	if (sscanf(argv[1], "%hu", &porta) != 1) {		///@FIXME: retorna caracteres válidos e ignora restante (ex: 77z => 77)
-		fprintf(stderr, "Porta mal formatada\n");
+	if (argc != 3) {	// o programa espera um argumento (porta TCP para abrir)
+		fprintf(stderr, "Uso: %s ip porta\n", argv[0]);
 		exit(1);
 	}
 	
@@ -32,21 +36,26 @@ int main(int argc, char **argv) {
 	hints.ai_protocol = IPPROTO_TCP;
 	
 	int ret;
-	if ((ret = getaddrinfo(argv[1], argv[2], &hints, &res))) gai_err("getaddrinfo", ret);
-	for (try = res; try != NULL; try = try->ai_next) {
-		if ((connection = socket(try->ai_family, try->ai_socktype, try->ai_protocol)) != -1) {
-			printf("Connecting...\n");
-			if (connect(connection, try->ai_addr, try->ai_addrlen) == 0) break;
-			perror("connect");
-			close(connection);	//can't connect, close socket
-		}
-	}
-	if (try == NULL) {
-		printf("Can't connect!\n");
+	if ((ret = getaddrinfo(argv[1], argv[2], &hints, &res))) {
+		fprintf(stderr, "%s: %s\n", "getaddrinfo", gai_strerror(r));
 		exit(1);
 	}
-	freeaddrinfo(res);
 	
+	for (try = res; try != NULL; try = try->ai_next) {
+		if ((connection = socket(try->ai_family, try->ai_socktype, try->ai_protocol)) != -1) {
+			printf("Conectando...\n");
+			if (connect(connection, try->ai_addr, try->ai_addrlen) == 0) break;
+			perror("connect");
+			close(connection);
+		}
+	}
+	
+	if (try == NULL) {
+		printf("Falha na conexão\n");
+		exit(1);
+	}
+	
+	freeaddrinfo(res);
 	
 	// se recebermos SIGINT, enviamos novo pacote
 	struct sigaction sinal;
@@ -54,8 +63,11 @@ int main(int argc, char **argv) {
 	sinal.sa_handler = sig_handler;
 	try(sigaction(SIGINT, &sinal, NULL), "sigaction");
 	
-	
-	
-	
-	
+	for (;;) {
+		if (fgets(p, sizeof(buf) - (p - buf), stdin) == NULL) {
+			fprintf(stderr, "Erro fgets\n");
+			exit(1);
+		}
+		p = rawmemchr(p, 0);
+	}
 }

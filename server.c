@@ -29,7 +29,7 @@ int main (int argc, char **argv) {
 			write(argumentos->fd_con, "{\"msg\":\"Número máximo de clientes atingido\",\"fim\"}", sizeof("{\"msg\":\"Número máximo de clientes atingido\",\"fim\"}"));
 			close(argumentos->fd_con);
 		}
-		char ip[16];	///@WARN: IPv6 usa mais que 16 caracteres! Editar se for utilizá-lo!
+		char ip[64];
 		try0(inet_ntop(AF_INET, &endereco_cliente.sin_addr, ip, sizeof(ip) - 1), "inet_ntop");
 		printf("%s conectado (fd = %d), total %d\n", ip, argumentos->fd_con, clientes_agora + 1);
 		#ifndef NAO_CHECA_JA_CONECTADO
