@@ -350,7 +350,7 @@ int json_get_bool(json_parser *json, const char *search) {
 
 char *json_get_array(json_parser *json, const char *search) {
 	json_pair *result;
-	if ((result =json_get(json, search, JSON_ARRAY)) == NULL)
+	if ((result = json_get(json, search, JSON_ARRAY)) == NULL)
 		return NULL;
 	return result->value;
 }
@@ -366,11 +366,12 @@ int json_array_i(char *array, int n) {
 		if ((array = strchr(array, ',')) == NULL)
 			return JSON_INVALID;	///@TODO: Isso precisa ser arrumado (-1 não poderá ser lido pois retornará o mesmo que JSON_INVALID),
 									/// mas não é importante agora
+		array++;
 	}
 	for (; *array; array++) {
 		switch (*array) {
 			case '0': case '1': case '2': case '3': case '4': case '5':
-			case '6': case '7': case '8': case '9':
+			case '6': case '7': case '8': case '9': case '-':
 				sscanf(array, "%d", &ret);
 				return ret;
 			case '\t':
@@ -384,3 +385,7 @@ int json_array_i(char *array, int n) {
 	}
 	return JSON_INVALID;
 }
+
+//int json_array_next(char *array) {
+	// Uma função que retorne o próximo item da array
+//}

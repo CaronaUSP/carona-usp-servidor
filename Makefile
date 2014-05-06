@@ -16,9 +16,13 @@ LIB_PTHREADS=-lpthread
 LIB_CRYPTO=-lcrypto
 
 # Esses devem ser mudados para configurar a compilação como desejado
+# Defines que retiram algumas partes de código, úteis para teste:
+# NAO_CHECA_JA_CONECTADO: Permite várias conexões do mesmo IP
+# NAO_CHECA_SENHA: Não checa se o hash está correto
+#DEFINES=-DNAO_CHECA_JA_CONECTADO -DNAO_CHECA_SENHA
 # Flags para gerar objetos (usar OPTIMIZE no lugar de DBG ativa várias otimizações
 # e não inclui dados de depuração no executável):
-CFLAGS=-c -Wall -Wextra $(DBG) -DNAO_CHECA_JA_CONECTADO
+CFLAGS=-c -Wall -Wextra $(DBG) $(DEFINES)
 # Flags para o linker (adicione outras bibiliotecas, caso necessário):
 LDFLAGS=$(LIB_PTHREADS) $(LIB_CRYPTO)
 # Nome do executável a ser gerado:

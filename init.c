@@ -73,6 +73,7 @@ void inicializa(int argc, char **argv) {
 		pilha_threads_livres[i] = i;
 		pthread_cond_init(&comunica_thread[i], NULL);
 		pthread_mutex_init(&mutex_comunicacao[i], NULL);
+		pthread_mutex_init(&mutex_esperando_dar_carona[i], NULL);
 	}
 	
 	// mutex para atualização de dados comuns às threads
