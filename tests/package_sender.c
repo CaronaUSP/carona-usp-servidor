@@ -5,20 +5,15 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <signal.h>
+#include <errno.h>
+#include <poll.h>
 
 #define error(msg)		do {perror(msg); exit(1);} while(0)
 #define try(cmd, msg) 	do {if ((cmd) == -1) {error(msg);}} while(0)
 
-char buf[2000] = {0}, *p = buf;
-int s;	//socket
-
-// Se recebermos SIGINT, enviamos um novo pacote:
-static void sig_handler(int __attribute__((unused)) signo) {
-		printf("I: Recebido SIGINT\n");
-		try(write(s, buf, strlen(buf) + 1), "write");
-		p = buf;
-}
-
+char buf[2000] = {0};
+int s, connection;	//socket
 
 int main(int argc, char **argv) {
 	
@@ -37,7 +32,7 @@ int main(int argc, char **argv) {
 	
 	int ret;
 	if ((ret = getaddrinfo(argv[1], argv[2], &hints, &res))) {
-		fprintf(stderr, "%s: %s\n", "getaddrinfo", gai_strerror(r));
+		fprintf(stderr, "%s: %s\n", "getaddrinfo", gai_strerror(ret));
 		exit(1);
 	}
 	
@@ -57,17 +52,29 @@ int main(int argc, char **argv) {
 	
 	freeaddrinfo(res);
 	
-	// se recebermos SIGINT, enviamos novo pacote
-	struct sigaction sinal;
-	memset((char *) &sinal, 0, sizeof(sinal));
-	sinal.sa_handler = sig_handler;
-	try(sigaction(SIGINT, &sinal, NULL), "sigaction");
+	struct pollfd fds[2];
+	
+	fds[0].fd = 0;
+	fds[0].events = POLLIN;
+	fds[1].fd = connection;
+	fds[1].events = POLLIN;
 	
 	for (;;) {
-		if (fgets(p, sizeof(buf) - (p - buf), stdin) == NULL) {
-			fprintf(stderr, "Erro fgets\n");
-			exit(1);
+		char resposta[1000];
+		
+		try(poll(fds, 2, -1), "poll");
+		
+		if (fds[0].revents & POLL_IN) {
+			if (fgets(buf, sizeof(buf), stdin) == NULL)
+				error("fgets");
+			try(write(connection, buf, strlen(buf) + 1), "write");
 		}
-		p = rawmemchr(p, 0);
+		
+		if (fds[1].revents & POLL_IN) {
+			int size;
+			try(size = read(connection, resposta, sizeof(resposta) - 1), "read");
+			resposta[size] = 0;
+			printf("%s", resposta);
+		}
 	}
 }

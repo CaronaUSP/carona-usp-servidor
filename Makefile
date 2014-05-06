@@ -19,7 +19,7 @@ LIB_CRYPTO=-lcrypto
 # Defines que retiram algumas partes de código, úteis para teste:
 # NAO_CHECA_JA_CONECTADO: Permite várias conexões do mesmo IP
 # NAO_CHECA_SENHA: Não checa se o hash está correto
-#DEFINES=-DNAO_CHECA_JA_CONECTADO -DNAO_CHECA_SENHA
+DEFINES=-DNAO_CHECA_JA_CONECTADO -DNAO_CHECA_SENHA
 # Flags para gerar objetos (usar OPTIMIZE no lugar de DBG ativa várias otimizações
 # e não inclui dados de depuração no executável):
 CFLAGS=-c -Wall -Wextra $(DBG) $(DEFINES)

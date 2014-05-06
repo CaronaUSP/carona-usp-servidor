@@ -159,6 +159,8 @@ void* th_conecao_cliente(void *tmp) {
 		printf("Falha JSON parse\n");
 		pthread_exit(NULL);
 	}
+	
+	#ifndef NAO_CHECA_SENHA
 	if ((hash = json_get_str(&json, "hash")) == NULL) {
 		printf("Chave \"hash\" não encontrada\n");
 		pthread_exit(NULL);
@@ -179,12 +181,12 @@ void* th_conecao_cliente(void *tmp) {
 	// Hash da senha é "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"
 	// para qualquer usuário enviado.
 	
-	#ifndef NAO_CHECA_SENHA
 	if (senha_correta(usuario, str_hash, hash) == 0) {
 		printf("Falha de autenticação\n");
 		finaliza("{\"msg\":\"Falha de autenticação\",\"fim\"}");
 	}
 	#endif
+	
 	leitura(&l);
 	if (json_all_parse(&json) < 0) {
 		printf("Falha JSON parse\n");
