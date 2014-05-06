@@ -12,11 +12,11 @@
 #define error(msg)		do {perror(msg); exit(1);} while(0)
 #define try(cmd, msg) 	do {if ((cmd) == -1) {error(msg);}} while(0)
 
-char buf[2000] = {0};
-int s, connection;	//socket
 
 int main(int argc, char **argv) {
-	
+	char buf[2000] = {0};
+	int s, connection;	//socket
+		
 	if (argc != 3) {	// o programa espera um argumento (porta TCP para abrir)
 		fprintf(stderr, "Uso: %s ip porta\n", argv[0]);
 		exit(1);
@@ -56,25 +56,26 @@ int main(int argc, char **argv) {
 	
 	fds[0].fd = 0;
 	fds[0].events = POLLIN;
+	fds[0].revents = 0;
 	fds[1].fd = connection;
 	fds[1].events = POLLIN;
+	fds[1].revents = 0;
 	
 	for (;;) {
-		char resposta[1000];
+		
 		
 		try(poll(fds, 2, -1), "poll");
 		
 		if (fds[0].revents & POLL_IN) {
-			if (fgets(buf, sizeof(buf), stdin) == NULL)
-				error("fgets");
+			fgets(buf, sizeof(buf), stdin);
 			try(write(connection, buf, strlen(buf) + 1), "write");
 		}
 		
 		if (fds[1].revents & POLL_IN) {
 			int size;
-			try(size = read(connection, resposta, sizeof(resposta) - 1), "read");
-			resposta[size] = 0;
-			printf("%s", resposta);
+			try(size = read(connection, buf, sizeof(buf) - 1), "read");
+			buf[size] = 0;
+			puts(buf);
 		}
 	}
 }
