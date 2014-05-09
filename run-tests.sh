@@ -1,11 +1,18 @@
 #!/bin/bash
 
-mkdir tests-tmp
-cd tests-tmp
-mkfifo pipe-msg-to-nc
+# Se não estiverem definidas, PORTA = 80 e IP = localhost
+if [ -z "$PORTA" ]; then
+	PORTA=80
+fi
 
-../server $PORTA &
-../file-to-out.sh pipe-msg-to-nc | nc localhost $PORTA
+if [ -z "$IP" ]; then
+	IP="localhost"
+fi
 
-cd -
-rm -r tests-tmp
+mkdir -p local
+gcc -o local/package_sender tests/package_sender.c
+
+for file in tests/test*.sh
+do
+	cat $file | local/package_sender $IP $PORTA
+done

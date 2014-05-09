@@ -29,12 +29,14 @@ LDFLAGS=$(LIB_PTHREADS) $(LIB_CRYPTO)
 EXECUTABLE=server
 # Arquivos de configurações globais (edições fazem o projeto todo ser reconstruído):
 GLOBALDEPS=global.h config.h
+# Diretório de saída:
+OUTPUT=bin/
 
 TARGETS:=$(wildcard *.c)
 OBJECTS=$(patsubst %.c,%.o,$(TARGETS))
 ALL_OBJECTS:=$(wildcard *.o)
 # $< = prerequisito, $@ = alvo:
-COMPILE=$(CC) $(CFLAGS) $< -o $@
+COMPILE=$(CC) $(CFLAGS) $< -o $(OUTPUT)$@
 LINK=$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
 RM=-rm -rf
 
