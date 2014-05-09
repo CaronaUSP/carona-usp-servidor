@@ -73,9 +73,8 @@ void* th_limpeza(void *tmp) {
 /*******************************************************************************
  * char *leitura(leitura_t *leitura);
  * Retorna ponteiro para próximo pacote JSON (busca após byte nulo, que
- * representa o fim do atual
+ * representa o fim do atual)
  ******************************************************************************/
- ///@TODO: Preciso testar isso direito
 char *leitura(leitura_t *l) {
 	char *busca_nulo, *ret;
 	

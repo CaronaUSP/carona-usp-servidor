@@ -36,8 +36,8 @@ TARGETS:=$(wildcard *.c)
 OBJECTS=$(patsubst %.c,%.o,$(TARGETS))
 ALL_OBJECTS:=$(wildcard *.o)
 # $< = prerequisito, $@ = alvo:
-COMPILE=$(CC) $(CFLAGS) $< -o $(OUTPUT)$@
-LINK=$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
+COMPILE=$(CC) $(CFLAGS) $< -o $@
+LINK=$(CC) $(OBJECTS) -o $(OUTPUT)$@ $(LDFLAGS)
 RM=-rm -rf
 
 .PHONY: all clean
