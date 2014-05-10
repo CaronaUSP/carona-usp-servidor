@@ -98,7 +98,7 @@ char *leitura(leitura_t *l) {
 	// Senão, copiamos o início do pacote desejado para o início do buffer e lemos até completar l->tamanho_max bytes
 	l->fim_pacote -= l->fim_msg - l->area + 1;
 	memmove(l->area, l->fim_msg + 1, l->fim_msg - l->area + 1);
-	
+	l->fim_msg = l->area - 1;
 	
 	int bytes_lidos;
 	for (;;) {
@@ -112,7 +112,7 @@ char *leitura(leitura_t *l) {
 		
 		l->fim_pacote += bytes_lidos;
 		
-		if ((busca_nulo = memchr(l->fim_msg	 + 1, 0, l->fim_pacote - l->fim_msg)) != NULL) {
+		if ((busca_nulo = memchr(l->fim_msg + 1, 0, l->fim_pacote - l->fim_msg)) != NULL) {
 			// Atualizamos o fim da mensagem JSON
 			l->fim_msg = busca_nulo;
 			// Retornamos a próxima msg
@@ -139,7 +139,7 @@ void* th_conecao_cliente(void *tmp) {
 	sprintf(mensagem, "{\"login\":\"%s\"}""", str_hash);
 	envia(mensagem, strlen(mensagem) + 1);
 	
-	char resposta[1024], *hash, *usuario;
+	char resposta[2000], *hash, *usuario;
 	
 	///@FIXME: aceita mensagens até 1024 bytes, senão as corta
 	l.area = resposta;
@@ -187,6 +187,10 @@ void* th_conecao_cliente(void *tmp) {
 	#endif
 	
 	leitura(&l);
+	json.n_pairs = 200;	///@FIXME: n_pairs guarda o espaço total alocado antes da chamada
+						///e o número de pares depois da chamada. Ou seja, a cada chamada
+						///a função reseta o número de pares e ele precisa ser inicializado
+						///de novo. É confuso e deve ser mudado.
 	if (json_all_parse(&json) < 0) {
 		printf("Falha JSON parse\n");
 		pthread_exit(NULL);
