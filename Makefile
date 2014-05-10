@@ -39,12 +39,14 @@ ALL_OBJECTS:=$(wildcard *.o)
 COMPILE=$(CC) $(CFLAGS) $< -o $@
 LINK=$(CC) $(OBJECTS) -o $(OUTPUT)$@ $(LDFLAGS)
 RM=-rm -rf
+MKDIR=mkdir -p
 
 .PHONY: all clean
 
 all: $(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJECTS)
+	$(MKDIR) $(OUTPUT)
 	$(LINK)
 
 # Declarações de dependência entre arquivos.
