@@ -1,1 +1,0 @@
-{"usuario" : "teste", "inicio" : 0, "fim" : 2, "hash" : "158256c9ac946fba45ca4868bc5b501deaf234ff6fcee73402222e503d4585a7", "a" : "sadfjsdahfsdafjgsdk", "str":"a", "inteiro" : 12345, "nusp" : 1, "abobora" : 2, "verdadeiro" : true, "falso" : false, "nulo" : null, "array" : [1, 2, 3, 4, 5, 6, 7, "oi", "foo", "bar"] }
