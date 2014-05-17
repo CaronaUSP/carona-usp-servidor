@@ -5,16 +5,17 @@
  * Carona Comunitária USP is licensed under a Creative Commons
  * Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0).
  * 
- * Funções de inicialização/finalização
+ * Configurações do servidor
 *******************************************************************************/
 
-#ifndef __INIT_H__
-#define __INIT_H__
-#include "global.h"
-#include "conexao.h"
-#include "mail.h"
-#include <signal.h>
-#include <curl/curl.h>
+#ifndef __CONFIG_H__
+#define __CONFIG_H__
 
-void inicializa(int argc, char **argv);
+#define MAX_CLIENTES	200
+// Mensagem de informação, deve mudar de tempos em tempos
+///@TODO: não deve ser uma constante
+#define MSG_NOVIDADES	"Projeto de graduação para melhorar a mobilidade na USP!"
+
+#define MSG_ERR_COMUNICACAO	"{\"msg\":\"Falha na comunicação com o servidor\",\"fim\"}"
+
 #endif

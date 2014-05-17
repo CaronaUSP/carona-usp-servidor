@@ -176,21 +176,13 @@ void* th_conecao_cliente(void *tmp) {
 		pthread_exit(NULL);
 	}
 	
-	if (json_get_null(&json, "cadastro")) {
-		///@TODO:
-		/// Envia e-mail, reponde ao cliente que e-mail foi enviado, cliente coloca
-		/// caixa para entrada do código (um inteiro), servidor recebe entrada do usuário,
-		/// compara com código enviado por e-mail e aceita (adiciona usuário e hash)
-		/// ou rejeita
-	} else {
-		// Usuário é, por enquanto, ignorado no cálculo do hash (ver hash.c).
-		// Hash da senha é "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"
-		// para qualquer usuário enviado.
-		
-		if (senha_correta(usuario, str_hash, hash) == 0) {
-			printf("Falha de autenticação\n");
-			finaliza("{\"msg\":\"Falha de autenticação\",\"fim\"}");
-		}
+	// Usuário é, por enquanto, ignorado no cálculo do hash (ver hash.c).
+	// Hash da senha é "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"
+	// para qualquer usuário enviado.
+	
+	if (senha_correta(usuario, str_hash, hash) == 0) {
+		printf("Falha de autenticação\n");
+		finaliza("{\"msg\":\"Falha de autenticação\",\"fim\"}");
 	}
 	#endif
 	

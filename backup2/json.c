@@ -348,12 +348,6 @@ int json_get_bool(json_parser *json, const char *search) {
 	return JSON_INVALID;
 }
 
-int json_get_null(json_parser *json, const char *search) {
-	if (json_get(json, search, JSON_NULL)  != NULL)
-		return 0;
-	return JSON_INVALID;
-}
-
 char *json_get_array(json_parser *json, const char *search) {
 	json_pair *result;
 	if ((result = json_get(json, search, JSON_ARRAY)) == NULL)

@@ -5,16 +5,13 @@
  * Carona Comunitária USP is licensed under a Creative Commons
  * Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0).
  * 
- * Funções de inicialização/finalização
+ * Funções para envio de e-mails de confirmação
 *******************************************************************************/
 
-#ifndef __INIT_H__
-#define __INIT_H__
-#include "global.h"
-#include "conexao.h"
-#include "mail.h"
-#include <signal.h>
+#ifndef __MAIL_H__
+#define __MAIL_H__
+
+#include <stdio.h>
 #include <curl/curl.h>
 
-void inicializa(int argc, char **argv);
 #endif

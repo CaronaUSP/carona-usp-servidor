@@ -5,16 +5,16 @@
  * Carona Comunitária USP is licensed under a Creative Commons
  * Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0).
  * 
- * Funções de inicialização/finalização
+ * Funções para envio de e-mails de confirmação
 *******************************************************************************/
 
-#ifndef __INIT_H__
-#define __INIT_H__
-#include "global.h"
-#include "conexao.h"
-#include "mail.h"
-#include <signal.h>
-#include <curl/curl.h>
+// http://curl.haxx.se/libcurl/c/ e http://curl.haxx.se/libcurl/c/allfuncs.html
+// são úteis :)
 
-void inicializa(int argc, char **argv);
-#endif
+#include "mail.h"
+
+int send(const char *usuario, int codigo) {
+	CURL *curl;
+	curl = curl_easy_init();
+	
+}

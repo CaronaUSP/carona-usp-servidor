@@ -87,8 +87,9 @@ void inicializa(int argc, char **argv) {
 	
 	// Inicializa cURL (ver http://curl.haxx.se/libcurl/c/curl_global_init.html):
 	// precisa ser feito sem outras threads
-	if ((curl = curl_easy_init()) == NULL) {
-		fprintf(stderr, "curl_easy_init() falhou\n");
+	CURLcode err;
+	if ((err = curl_global_init(CURL_GLOBAL_DEFAULT)) != 0) {
+		fprintf(stderr, "cURL: %s\n", curl_easy_strerror(err));
 	}
 	
 }

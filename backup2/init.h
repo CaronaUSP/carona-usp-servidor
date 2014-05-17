@@ -12,7 +12,6 @@
 #define __INIT_H__
 #include "global.h"
 #include "conexao.h"
-#include "mail.h"
 #include <signal.h>
 #include <curl/curl.h>
 

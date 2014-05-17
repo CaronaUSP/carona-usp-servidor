@@ -14,7 +14,6 @@ DBG=-g
 OPTIMIZE=-O3
 LIB_PTHREADS=-lpthread
 LIB_CRYPTO=-lcrypto
-LIB_CURL=-lcurl
 
 # Variáveis para envio de e-mails
 ifndef SMTP_USER
@@ -23,23 +22,23 @@ endif
 ifndef SMTP_PASSWORD
 $(error SMTP_PASSWORD não está configurado)
 endif
-ifndef SMTP_EMAIL
-$(error SMTP_EMAIL não está configurado)
-endif
 ifndef SMTP_ADDRESS
-$(error SMTP_ADDRESS não está configurado - use o formato smtp://servidor:porta)
+$(error SMTP_ADDRESS não está configurado)
+endif
+ifndef SMTP_PORT
+SMTP_PORT=465
 endif
 
 # Esses devem ser mudados para configurar a compilação como desejado
 # Defines que retiram algumas partes de código, úteis para teste:
 # NAO_CHECA_JA_CONECTADO: Permite várias conexões do mesmo IP
 # NAO_CHECA_SENHA: Não checa se o hash está correto
-DEFINES=-DNAO_CHECA_JA_CONECTADO -DNAO_CHECA_SENHA -DSMTP_USER='"$(SMTP_USER)"' -DSMTP_PASSWORD='"$(SMTP_PASSWORD)"' -DSMTP_EMAIL='"$(SMTP_EMAIL)"' -DSMTP_ADDRESS='"$(SMTP_ADDRESS)"'
+DEFINES=-DNAO_CHECA_JA_CONECTADO -DNAO_CHECA_SENHA -DSMTP_USER="$(SMTP_USER)" -DSMTP_PASSWORD="$(SMTP_PASSWORD)" -DSMTP_ADDRESS="$(SMTP_ADDRESS)" -DSMTP_PORT=$(SMTP_PORT)
 # Flags para gerar objetos (usar OPTIMIZE no lugar de DBG ativa várias otimizações
 # e não inclui dados de depuração no executável):
 CFLAGS=-c -Wall -Wextra $(DBG) $(DEFINES)
 # Flags para o linker (adicione outras bibiliotecas, caso necessário):
-LDFLAGS=$(LIB_PTHREADS) $(LIB_CRYPTO) $(LIB_CURL)
+LDFLAGS=$(LIB_PTHREADS) $(LIB_CRYPTO)
 # Nome do executável a ser gerado:
 EXECUTABLE=server
 # Arquivos de configurações globais (edições fazem o projeto todo ser reconstruído):
@@ -55,8 +54,6 @@ COMPILE=$(CC) $(CFLAGS) $< -o $@
 LINK=$(CC) $(OBJECTS) -o $(OUTPUT)$@ $(LDFLAGS)
 RM=-rm -rf
 MKDIR=mkdir -p
-MAKEFILE_PATH:=$(abspath $(lastword $(MAKEFILE_LIST)))
-SOURCE_DIR:=$(dir $(MAKEFILE_PATH))
 
 .PHONY: all clean
 
@@ -91,17 +88,11 @@ hash.o: hash.c hash.h $(GLOBALDEPS)
 conexao.o: conexao.c conexao.h hash.o mail.o $(GLOBALDEPS)
 	$(COMPILE)
 
-init.o: init.c init.h conexao.o mail.o $(GLOBALDEPS)
+init.o: init.c init.h conexao.o $(GLOBALDEPS)
 	$(COMPILE)
 
 server.o: server.c server.h conexao.o init.o $(GLOBALDEPS)
 	$(COMPILE)
-
-envia_email: tests/envia_email.c mail.o
-	$(MKDIR) $(OUTPUT)
-	$(CC) $(CFLAGS) tests/envia_email.c -o $(SOURCE_DIR)/envia_email.o -I$(SOURCE_DIR)
-	$(CC) mail.o envia_email.o -o $(OUTPUT)/envia_email $(LIB_CURL)
-
 
 %.o: %.c %.h $(GLOBALDEPS)
 	@echo "********************************************************************"
