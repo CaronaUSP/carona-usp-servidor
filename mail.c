@@ -52,7 +52,6 @@ int envia_email(const char *usuario, int codigo) {
 	setopt(CURLOPT_USERNAME, SMTP_USER, "CURLOPT_USERNAME", SMTP_USER);
 	setopt(CURLOPT_PASSWORD, SMTP_PASSWORD, "CURLOPT_PASSWORD", SMTP_PASSWORD);
 	setopt(CURLOPT_URL, SMTP_ADDRESS, "CURLOPT_URL", SMTP_ADDRESS);
-	setopt(CURLOPT_USE_SSL, (long)CURLUSESSL_ALL, "CURLOPT_USE_SSL", "(long)CURLUSESSL_ALL");
 	int size = snprintf(email, sizeof(email), "<%s@usp.br>", usuario);
 	if (size < 0 || size >= (int) sizeof(email)) {		// falha ou endereço não cabe em 256 bytes
 		fprintf(stderr, "Falha na conversão de e-mail\n");
@@ -68,6 +67,7 @@ int envia_email(const char *usuario, int codigo) {
 	setopt(CURLOPT_MAIL_RCPT, destinos, "CURLOPT_MAIL_RCPT", "destinos");
 	setopt(CURLOPT_READFUNCTION, leitura_dados_curl, "CURLOPT_READFUNCTION", "leitura_dados_curl");
 	//setopt(CURLOPT_READDATA, NULL);
+	setopt(CURLOPT_UPLOAD, 1L, "CURL_UPLOAD", "1L");
 	
 	// Opcional:
 	setopt(CURLOPT_VERBOSE, 1L, "CURLOPT_VERBOSE", "1L");

@@ -17,7 +17,7 @@
 #include <string.h>
 
 extern CURL *curl;	// Todos os envios vão usar a mesma conexão com o servidor.
-					// Cada thread que requisitar um envio adquirir um mutex
+					// Cada thread que requisitar um envio vai adquirir um mutex
 					// e outras vão esperar a liberação. Há outras opções (criar
 					// uma pilha no programa ou usar a interface 
 					// http://curl.haxx.se/libcurl/c/libcurl-multi.html)

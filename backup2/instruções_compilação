@@ -1,6 +1,0 @@
-* Executar "make" para gerar o executável "server" (a flag -j [# de threads] é útil para acelerar o processo)
-* Requisitos: gcc, binutils, libssl-dev e outros (testem e adicionem aqui as outras dependências)
-* Há uma versão compilada inclusa no repositório ;)
-
-* Rodar "./server [porta]" para rodar o servidor em dada porta
-* No emulador android, conectar-se com seu ip ou "localhost" ou 127.0.0.1 e porta
