@@ -15,15 +15,20 @@
 #include <curl/curl.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef CURL_MUTEX
+#include <pthread.h>
+#endif
 
 extern CURL *curl;	// Todos os envios vão usar a mesma conexão com o servidor.
 					// Cada thread que requisitar um envio vai adquirir um mutex
 					// e outras vão esperar a liberação. Há outras opções (criar
 					// uma pilha no programa ou usar a interface 
-					// http://curl.haxx.se/libcurl/c/libcurl-multi.html)
+					// http://curl.haxx.se/libcurl/c/libcurl-multi.html ou criar
+					// várias conexões e isolar a função),
 					// mas é desnecessário otimizar aqui (provavelmete não
 					// pasaremos de alguns cadastros por minuto)
 
-extern int envia_email(const char *usuario, int codigo);
+extern int inicializa_email();
+extern int envia_email(const char *usuario, unsigned int codigo);
 
 #endif

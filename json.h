@@ -33,15 +33,15 @@
 #define JSON_FLOAT		JSON_NUMBER | 1
 
 typedef struct {
-	char *name;
+	const char *name;
 	int type;
-	char *value;
+	const char *value;
 } json_pair;
 
 typedef struct {
 	char *start, *cur;
 	json_pair *pairs;
-	int n_pairs;
+	int n_pairs, n_pairs_read;	// número total alocado e número de pares lidos
 } json_parser;
 
 typedef struct {
@@ -50,12 +50,12 @@ typedef struct {
 } json_value;
 
 void json_init(json_parser *json);
-char *json_get_str(json_parser *json, const char *search);
+const char *json_get_str(json_parser *json, const char *search);
 int json_all_parse(json_parser *json);
 int json_get_int(json_parser *json, const char *search);
 int json_get_bool(json_parser *json, const char *search);
 int json_get_null(json_parser *json, const char *search);
-char *json_get_array(json_parser *json, const char *search);
-int json_array_i(char *array, int n);
+const char *json_get_array(json_parser *json, const char *search);
+int json_array_i(const char *array, int n);
 
 #endif

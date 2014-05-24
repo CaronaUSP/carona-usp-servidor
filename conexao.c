@@ -139,7 +139,8 @@ void* th_conecao_cliente(void *tmp) {
 	sprintf(mensagem, "{\"login\":\"%s\"}""", str_hash);
 	envia(mensagem, strlen(mensagem) + 1);
 	
-	char resposta[2000], *hash, *usuario;
+	char resposta[2000];
+	const char *hash, *usuario;
 	
 	///@FIXME: aceita mensagens até 1024 bytes, senão as corta
 	l.area = resposta;
@@ -155,8 +156,8 @@ void* th_conecao_cliente(void *tmp) {
 	json.n_pairs = 200;
 	
 	if (json_all_parse(&json) < 0) {
-		printf("Falha JSON parse\n");
-		pthread_exit(NULL);
+		fprintf(stderr, "Falha JSON parse\n");
+		finaliza("{\"msg\":\"Falha JSON parse\",\"fim\"}");
 	}
 	
 	#ifndef NAO_CHECA_SENHA
@@ -176,42 +177,81 @@ void* th_conecao_cliente(void *tmp) {
 		pthread_exit(NULL);
 	}
 	
-	if (json_get_null(&json, "cadastro")) {
-		///@TODO:
-		/// Envia e-mail, reponde ao cliente que e-mail foi enviado, cliente coloca
-		/// caixa para entrada do código (um inteiro), servidor recebe entrada do usuário,
-		/// compara com código enviado por e-mail e aceita (adiciona usuário e hash)
-		/// ou rejeita
+	if (json_get_null(&json, "cadastro") != JSON_INVALID) {	// Existe o par cadastro
+		int cod = abs((int) random()), entrada_usuario;
+		printf("Novo usuário, criando cadastro\nCódigo: %d\n", cod);
+		#ifndef NAO_ENVIA_EMAIL
+		if (envia_email(usuario, cod) == -1)
+			finaliza("{\"msg\":\"Falha no envio de e-mail de confirmação\",\"fim\"}");
+		#endif
+		envia_fixo("{\"ok\":true}");
+		
+		char usuario_salvo[250], hash_salvo[33];
+		strncpy(usuario_salvo, usuario, sizeof(usuario_salvo));
+		usuario_salvo[sizeof(usuario_salvo) - 1] = 0;
+		strncpy(hash_salvo, hash, sizeof(hash_salvo));
+		hash_salvo[sizeof(hash_salvo) - 1] = 0;
+		
+		do {
+			leitura(&l);
+			if (json_all_parse(&json) < 0) {
+				fprintf(stderr, "Falha JSON parse\n");
+				pthread_exit(NULL);
+			}
+			
+			entrada_usuario = json_get_int(&json, "codigo");
+			
+			if (entrada_usuario == JSON_INVALID)
+				finaliza("{\"msg\":\"JSON: chave \"codigo\" não encontrada\",\"fim\"}");
+			
+			if (entrada_usuario != cod)
+				envia_fixo("{\"ok\":false}");
+			
+		} while (entrada_usuario != cod);
+		
+		add_user(usuario_salvo, hash_salvo);
+		
 	} else {
 		// Usuário é, por enquanto, ignorado no cálculo do hash (ver hash.c).
 		// Hash da senha é "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"
 		// para qualquer usuário enviado.
 		
-		if (senha_correta(usuario, str_hash, hash) == 0) {
+		const char *hash_senha = get_user(usuario);
+		if (hash_senha == NULL) {
+			finaliza("{\"msg\":\"Usuário não cadastrado\",\"fim\"}");
+		}
+		
+		/*
+		if (strcmp(hash_senha, hash)) {
+			printf("Falha de autenticação\n");
+			finaliza("{\"msg\":\"Falha de autenticação\",\"fim\"}");
+		}
+		*/
+		
+		if (senha_correta(hash_senha, str_hash, hash) == 0) {
 			printf("Falha de autenticação\n");
 			finaliza("{\"msg\":\"Falha de autenticação\",\"fim\"}");
 		}
 	}
 	#endif
 	
+	envia_fixo("{\"ok\":true}");	// autenticação OK
+	
 	leitura(&l);
-	json.n_pairs = 200;	///@FIXME: n_pairs guarda o espaço total alocado antes da chamada
-						///e o número de pares depois da chamada. Ou seja, a cada chamada
-						///a função reseta o número de pares e ele precisa ser inicializado
-						///de novo. É confuso e deve ser mudado.
+	
 	if (json_all_parse(&json) < 0) {
 		printf("Falha JSON parse\n");
 		pthread_exit(NULL);
 	}
 	
-	char *pontos = json_get_array(&json, "pontos");
+	const char *pontos = json_get_array(&json, "pontos");
 	
 	int i;
 	
 	if (pontos != NULL) {
 		
 		int prox_ponto;
-		for (i = 0; i < sizeof(caminhos[0]); i++) {
+		for (i = 0; i < (int) sizeof(caminhos[0]); i++) {
 			if ((prox_ponto = json_array_i(pontos, i)) == JSON_INVALID)
 				break;
 			printf("Ponto %d\n", prox_ponto);
@@ -241,9 +281,9 @@ void* th_conecao_cliente(void *tmp) {
 					break;
 					
 				case EBUSY:
-					for (j = 0; j < sizeof(caminhos[0]); j++) {
+					for (j = 0; j < (int) sizeof(caminhos[0]); j++) {
 							if (caminhos[i][j] == inicio) {
-								for (k = j + 1; k < sizeof(caminhos[0]); k++) {
+								for (k = j + 1; k < (int) sizeof(caminhos[0]); k++) {
 									if (caminhos[i][k] == fim) {
 										pthread_mutex_lock(&mutex_comunicacao[i]);
 										pthread_cond_signal(&comunica_thread[i]);

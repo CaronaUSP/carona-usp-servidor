@@ -13,6 +13,7 @@
 #include "global.h"
 #include "conexao.h"
 #include "mail.h"
+#include "database.h"
 #include <signal.h>
 #include <curl/curl.h>
 

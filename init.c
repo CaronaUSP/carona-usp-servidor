@@ -10,12 +10,24 @@
 
 #include "init.h"
 
+const char banco_de_dados[] = "database";
+
 // Se recebermos SIGINT, paramos o programa fechando as conexões.
 static void sig_handler(int __attribute__((unused)) signo) {
 		printf("I: Recebido SIGINT\n");
 		pthread_mutex_destroy(&mutex_modifica_thread);
-		///@TODO: atualizar .dados antes de fechar
 		close(s);
+		///@TODO: limpeza decente dos recursos utilizados
+		FILE *dados = fopen(".dados", "w");
+		if (dados != NULL) {
+			if (fprintf(dados, "%d %d", clientes_total, caronas_total) < 0)
+				fprintf(stderr, "Falha na escrita de .dados\n");
+		} else
+			fprintf(stderr, "Falha na escrita de .dados\n");
+		
+		fclose(dados);
+		
+		save_db(banco_de_dados);
 		exit(0);
 }
 
@@ -84,11 +96,23 @@ void inicializa(int argc, char **argv) {
 	// guardar variáveis da thread (se usássemos globais, haveria conflito entre
 	// as threads)
 	pthread_key_create(&dados_thread, NULL);
+	CURLcode ret;
+	ret = curl_global_init(CURL_GLOBAL_ALL);
+	if (ret != 0) {
+		fprintf(stderr, "curl_global_init(): %d\n", ret);
+		exit(1);
+	}
 	
-	// Inicializa cURL (ver http://curl.haxx.se/libcurl/c/curl_global_init.html):
-	// precisa ser feito sem outras threads
-	if ((curl = curl_easy_init()) == NULL) {
-		fprintf(stderr, "curl_easy_init() falhou\n");
+	if (init_db(banco_de_dados) == -1) {
+		fprintf(stderr, "Falha na inicialização do banco de dados\n");
+		exit(1);
+	}
+	
+	usuario_t *user = primeiro_usuario;
+	printf("Usuários:\n");
+	while (user != NULL) {
+		printf("%s - %s\n", user->email, user->hash);
+		user = user->next;
 	}
 	
 }

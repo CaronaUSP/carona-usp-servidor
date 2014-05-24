@@ -32,11 +32,10 @@
  * E compara os dois
  */
 
-int senha_correta (const char *usuario, const char *mensagem_autenticacao, const char *hash_recebido) {
+int senha_correta (const char *hash_senha, const char *mensagem_autenticacao, const char *hash_recebido) {
 	// Ver man 3 sha
 	unsigned char hash[SHA_256_DIGEST_LENGTH];
-	char hash_senha[2 * SHA_256_DIGEST_LENGTH] = "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF",
-		hash_calculado[2 * SHA_256_DIGEST_LENGTH + 1];
+	char hash_calculado[2 * SHA_256_DIGEST_LENGTH + 1];
 	int i;
 	
 	EVP_MD_CTX calcula_hash;

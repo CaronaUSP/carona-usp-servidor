@@ -12,6 +12,8 @@
 
 #include "global.h"
 #include "hash.h"
+#include "mail.h"
+#include "database.h"
 #include <errno.h>
 #include <pthread.h>
 #include <arpa/inet.h>
@@ -27,7 +29,7 @@ extern uint32_t conectados[MAX_CLIENTES];	// lista de IPs já conectados
 extern pthread_mutex_t mutex_modifica_thread;
 extern pthread_mutex_t mutex_comunicacao[MAX_CLIENTES];
 extern pthread_mutex_t mutex_esperando_dar_carona[MAX_CLIENTES];
-extern pthread_mutex_t mutex_curl;		// mutex para envio de e-mails
+
 extern pthread_cond_t comunica_thread[MAX_CLIENTES];
 extern pthread_key_t dados_thread;
 extern int pilha_threads_livres[MAX_CLIENTES];

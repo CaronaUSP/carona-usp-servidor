@@ -301,7 +301,7 @@ int json_all_parse(json_parser *json) {
 		}
 	}
 	
-	json->n_pairs = obj_n;
+	json->n_pairs_read = obj_n;
 	return 0;
 }
 
@@ -309,7 +309,7 @@ json_pair *json_get(json_parser *json, const char *search, int type) {
 	json_pair search_pair, *result;
 	search_pair.name = search;
 	
-	result = bsearch(&search_pair, json->pairs, json->n_pairs, sizeof(json_pair), cmp_json_pair);
+	result = bsearch(&search_pair, json->pairs, json->n_pairs_read, sizeof(json_pair), cmp_json_pair);
 	
 	if (result == NULL)
 		return NULL;
@@ -320,7 +320,7 @@ json_pair *json_get(json_parser *json, const char *search, int type) {
 	return NULL;
 }
 
-char *json_get_str(json_parser *json, const char *search) {
+const char *json_get_str(json_parser *json, const char *search) {
 	json_pair *result;
 	if ((result =json_get(json, search, JSON_STRING)) == NULL)
 		return NULL;
@@ -350,11 +350,11 @@ int json_get_bool(json_parser *json, const char *search) {
 
 int json_get_null(json_parser *json, const char *search) {
 	if (json_get(json, search, JSON_NULL)  != NULL)
-		return 0;
+		return 1;
 	return JSON_INVALID;
 }
 
-char *json_get_array(json_parser *json, const char *search) {
+const char *json_get_array(json_parser *json, const char *search) {
 	json_pair *result;
 	if ((result = json_get(json, search, JSON_ARRAY)) == NULL)
 		return NULL;
@@ -366,7 +366,7 @@ char *json_get_array(json_parser *json, const char *search) {
  */
 ///@TODO: função bem simples, falha em arrays ou objetos dentro de arrays.
 /// Mas usamos apenas arrays de inteiros no servidor, então não faz diferença
-int json_array_i(char *array, int n) {
+int json_array_i(const char *array, int n) {
 	int i, ret;
 	for (i = 0; i < n; i++) {
 		if ((array = strchr(array, ',')) == NULL)
