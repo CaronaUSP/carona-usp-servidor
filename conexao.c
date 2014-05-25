@@ -16,6 +16,9 @@ int caminhos[MAX_CLIENTES][30];
 uint32_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
 pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER, mutex_comunicacao[MAX_CLIENTES] = {PTHREAD_MUTEX_INITIALIZER},
 				mutex_esperando_dar_carona[MAX_CLIENTES] = {PTHREAD_MUTEX_INITIALIZER};	///@TODO: isso é temporário
+
+int comm[MAX_CLIENTES];
+
 pthread_cond_t comunica_thread[MAX_CLIENTES];
 pthread_key_t dados_thread;
 int pilha_threads_livres[MAX_CLIENTES];
@@ -262,6 +265,10 @@ void* th_conecao_cliente(void *tmp) {
 		pthread_mutex_lock(&mutex_comunicacao[tsd->n_thread]);
 		pthread_cond_wait(&comunica_thread[tsd->n_thread], &mutex_comunicacao[tsd->n_thread]);
 		
+		sprintf(mensagem, "{\"msg\":\"Thread %d receberá carona!\"}", comm[tsd->n_thread]);
+		finaliza(mensagem);
+		
+		
 	} else {
 		int inicio, fim;
 		if ((inicio = json_get_int(&json, "inicio")) == JSON_INVALID)
@@ -274,6 +281,8 @@ void* th_conecao_cliente(void *tmp) {
 		int j, k;
 		for (i = 0; i < MAX_CLIENTES; i++) {
 			// Checa se thread está esperando alguém para dar carona:
+			///@FIXME: Isso está bem errado e NÃO FUNCIONA se mais que uma
+			/// thread tentar o lock em paralelo
 			int falhou_lock = pthread_mutex_trylock(&mutex_esperando_dar_carona[i]);
 			switch (falhou_lock) {
 				case 0:
@@ -286,9 +295,12 @@ void* th_conecao_cliente(void *tmp) {
 								for (k = j + 1; k < (int) sizeof(caminhos[0]); k++) {
 									if (caminhos[i][k] == fim) {
 										pthread_mutex_lock(&mutex_comunicacao[i]);
+										if (caminhos[i][k] != fim)
+											continue;	// alguém conseguiu o mutex antes :(
+										comm[i] = tsd->n_thread;
 										pthread_cond_signal(&comunica_thread[i]);
 										pthread_mutex_unlock(&mutex_comunicacao[i]);
-										sprintf(mensagem, "{\"msg\":\"Usuário %d dará carona!\"}", i);
+										sprintf(mensagem, "{\"msg\":\"Thread %d dará carona!\"}", i);
 										finaliza(mensagem);
 									}
 								}

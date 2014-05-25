@@ -11,9 +11,6 @@
 #ifndef __PASSWORDS_H__
 #define __PASSWORDS_H__
 
-#define error(msg)		do {perror(msg); exit(1);} while(0)
-#define tryEOF(cmd,msg)	do {if ((cmd) == EOF) {error(msg);}} while(0)
-
 typedef struct usuario_struct {
 	const char *email;
 	const char *hash;

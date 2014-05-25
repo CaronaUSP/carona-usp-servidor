@@ -8,10 +8,17 @@
  * Funções para o banco de dados de usuários
 *******************************************************************************/
 
+#define _GNU_SOURCE
+
 #include "database.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define error(msg)		do {perror(msg); return -1;} while(0)
+#define tryEOF(cmd,msg)	do {if ((cmd) == EOF) {error(msg);}} while(0)
+#define try(cmd,msg)	do {if ((cmd) == -1) {error(msg);}} while(0)
+#define try0(cmd,msg)	do {if ((cmd) == NULL) {error(msg);}} while(0)
 
 usuario_t *primeiro_usuario = NULL, *ultimo_usuario;
 
@@ -21,60 +28,51 @@ usuario_t *primeiro_usuario = NULL, *ultimo_usuario;
 
 int init_db(const char *arquivo) {
 	FILE *db = fopen(arquivo, "r");
-	char email[258], hash[66];
-	usuario_t *atual;
+	char *db_data;
 	if (db != NULL) {
-		if (fgets(email, sizeof(email), db) == NULL ||
-			fgets(hash, sizeof(hash), db) == NULL) {
-			tryEOF(fclose(db), "fclose");
+		
+		try(fseek(db, 0, SEEK_END), "seek");
+		
+		long db_size = ftell(db);
+		try(db_size, "ftell");
+		if (db_size == 0)
 			return 0;
-		}
+		try0(db_data = malloc((size_t) db_size + 1), "malloc");	// colocar caractere nulo no fim
 		
-		char *fim = strchr(email, '\n');
-		if (fim != NULL)
-			*fim = 0;
+		db_data[db_size] = 0;
 		
-		fim = strchr(hash, '\n');
-		if (fim != NULL)
-			*fim = 0;
-		
-		size_t len_email = strlen(email) + 1;
-		primeiro_usuario = malloc(sizeof(usuario_t) + len_email + strlen(hash) + 1);
-		if (primeiro_usuario == NULL)
+		rewind(db);
+		if (fread(db_data, 1, db_size, db) != (size_t) db_size) {
+			///@TODO: poderia ter código para tentar novamente...
+			fprintf(stderr, "Falha na leitura do banco de dados\n");
 			return -1;
-		char *buf_email = (char *) primeiro_usuario + sizeof(usuario_t),
-				*buf_hash = buf_email + len_email;
-		strcpy(buf_email, email);
-		strcpy(buf_hash, hash);
-		ultimo_usuario = primeiro_usuario;
-		ultimo_usuario->email = buf_email;
-		ultimo_usuario->hash = buf_hash;
-		while (fgets(email, sizeof(email), db) != NULL &&
-				fgets(hash, sizeof(hash), db) != NULL) {
-			
-			len_email = strlen(email) + 1;
-			atual = malloc(sizeof(usuario_t) + len_email + strlen(hash) + 1);
-			
-			buf_email = (char *) atual + sizeof(usuario_t),
-			buf_hash = buf_email + len_email;
-			
-			fim = strchr(email, '\n');
-			if (fim != NULL)
-				*fim = 0;
-			
-			fim = strchr(hash, '\n');
-			if (fim != NULL)
-				*fim = 0;
-			strcpy(buf_email, email);
-			strcpy(buf_hash, hash);
-			
-			ultimo_usuario->next = atual;
-			atual->email = buf_email;
-			atual->hash = buf_hash;
-			ultimo_usuario = atual;
 		}
-		tryEOF(fclose(db), "fclose");
-		ultimo_usuario->next = NULL;
+		
+		int user_n;
+		char *search = db_data;
+		for (user_n = 1; (search = strchr(search + 1, '\n')); user_n++) *search = 0;
+		
+		user_n /= 2;
+		printf("%d usuários cadastrados\n", user_n);
+		
+		primeiro_usuario = malloc(user_n * sizeof(usuario_t));
+		try0(primeiro_usuario, "malloc");
+		
+		int i;
+		search = db_data;
+		for (i = 0; i < user_n - 1; i++) {
+			primeiro_usuario[i].email = search;
+			search = rawmemchr(search + 1, 0) + 1;
+			primeiro_usuario[i].hash = search;
+			search = rawmemchr(search + 1, 0) + 1;
+			primeiro_usuario[i].next = &primeiro_usuario[i + 1];
+		}
+		primeiro_usuario[i].email = search;
+		search = rawmemchr(search + 1, 0) + 1;
+		primeiro_usuario[i].hash = search;
+		primeiro_usuario[i].next = NULL;	// marca última entrada
+		ultimo_usuario = &primeiro_usuario[i];
+		
 		return 0;
 	}
 	fprintf(stderr, "Falha na leitura do banco de dados\n");
@@ -82,7 +80,8 @@ int init_db(const char *arquivo) {
 }
 
 int add_user(const char *email, const char *hash) {
-	///@TODO: se usuário já existe, substituir entrada antiga
+	///@TODO: se usuário já existe, enviar e-mail caso o usuário tenha
+	/// esquecido a senha e substituir entrada antiga
 	usuario_t *novo;
 	novo = malloc(sizeof(usuario_t));
 	if (novo == NULL)
