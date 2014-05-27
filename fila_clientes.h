@@ -4,18 +4,21 @@
  * 
  * Carona Comunitária USP is licensed under a Creative Commons
  * Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0).
- * 
- * Configurações do servidor
+ * Funções paraa tratamento de fila de clientes esperando carona
 *******************************************************************************/
 
-#ifndef __CONFIG_H__
-#define __CONFIG_H__
+#include "config.h"
 
-#define MAX_CLIENTES	200
-// Mensagem de informação, deve mudar de tempos em tempos
-///@TODO: não deve ser uma constante
-#define MSG_NOVIDADES	"Projeto de graduação para melhorar a mobilidade na USP!"
+#ifndef __FILA_CLIENTES_H__
+#define __FILA_CLIENTES_H__
 
-#define MSG_ERR_COMUNICACAO	"{\"msg\":\"Falha na comunicação com o servidor\",\"fim\":null}"
+void adiciona_fila(int n);
+void remove_fila(int n);
+
+typedef struct lista_ligada_fila {
+	int numero, anterior, prox;
+} lista_ligada_fila_t;
+
+extern lista_ligada_fila_t fila[MAX_CLIENTES];
 
 #endif

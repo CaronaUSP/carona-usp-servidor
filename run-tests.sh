@@ -9,10 +9,9 @@ if [ -z "$IP" ]; then
 	IP="localhost"
 fi
 
-mkdir -p local
-gcc -o local/package_sender tests/package_sender.c
+make package_sender
 
-for file in tests/test*.sh
+for file in tests/test*
 do
 	cat $file | local/package_sender $IP $PORTA
 done

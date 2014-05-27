@@ -34,7 +34,7 @@ endif
 # Defines que retiram algumas partes de código, úteis para teste:
 # NAO_CHECA_JA_CONECTADO: Permite várias conexões do mesmo IP
 # NAO_CHECA_SENHA: Não checa se o hash está correto
-DEFINES=-DNAO_CHECA_JA_CONECTADO -DSMTP_USER='"$(SMTP_USER)"' -DSMTP_PASSWORD='"$(SMTP_PASSWORD)"' -DSMTP_EMAIL='"$(SMTP_EMAIL)"' -DSMTP_ADDRESS='"$(SMTP_ADDRESS)"' -DCURL_MUTEX -DNAO_ENVIA_EMAIL
+DEFINES=-DNAO_CHECA_JA_CONECTADO -DSMTP_USER='"$(SMTP_USER)"' -DSMTP_PASSWORD='"$(SMTP_PASSWORD)"' -DSMTP_EMAIL='"$(SMTP_EMAIL)"' -DSMTP_ADDRESS='"$(SMTP_ADDRESS)"' -DCURL_MUTEX
 # Flags para gerar objetos (usar OPTIMIZE no lugar de DBG ativa várias otimizações
 # e não inclui dados de depuração no executável):
 CFLAGS=-c -Wall -Wextra $(DBG) $(DEFINES)
@@ -100,6 +100,9 @@ server.o: server.c server.h conexao.o init.o $(GLOBALDEPS)
 database.o: database.c database.h
 	$(COMPILE)
 
+fila_clientes.o: fila_clientes.c fila_clientes.h config.h
+	$(COMPILE)
+
 envia_email: tests/envia_email.c mail.o
 	$(MKDIR) $(OUTPUT)
 	$(CC) $(CFLAGS) tests/envia_email.c -o $(SOURCE_DIR)/envia_email.o -I$(SOURCE_DIR)
@@ -109,6 +112,11 @@ database_test: tests/database_test.c database.o
 	$(MKDIR) $(OUTPUT)
 	$(CC) $(CFLAGS) tests/database_test.c -o $(SOURCE_DIR)/database_test.o -I$(SOURCE_DIR)
 	$(CC) database_test.o database.o -o $(OUTPUT)/database_test
+
+package_sender: tests/package_sender.c
+	$(MKDIR) $(OUTPUT)
+	$(CC) $(CFLAGS) tests/package_sender.c -o $(SOURCE_DIR)/package_sender.o
+	$(CC) package_sender.o -o $(OUTPUT)/package_sender
 
 %.o: %.c %.h $(GLOBALDEPS)
 	@echo "********************************************************************"

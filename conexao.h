@@ -5,6 +5,7 @@
  * Carona Comunitária USP is licensed under a Creative Commons
  * Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0).
  * 
+ * 
  * Tratamento de conexões e threads
 *******************************************************************************/
 #ifndef __CONEXAO__H__
@@ -14,6 +15,7 @@
 #include "hash.h"
 #include "mail.h"
 #include "database.h"
+#include "fila_clientes.h"
 #include <errno.h>
 #include <pthread.h>
 #include <arpa/inet.h>
