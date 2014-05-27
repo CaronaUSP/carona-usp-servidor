@@ -86,7 +86,7 @@ char *leitura(leitura_t *l) {
 	if (tsd == NULL) {
 		// Erro bem improvável (a chave foi inicializada em init.c), mas é bom tratá-lo aqui
 		printf("leitura: tsd não encontrada\n");
-		finaliza("{\"msg\":\"leitura(): TSD não encontrada\nIsso é um bug, reporte-o!!!\",\"fim\"}");
+		finaliza("{\"msg\":\"leitura(): TSD não encontrada\nIsso é um bug, reporte-o!!!\",\"fim\":null}");
 	}
 	
 	// Se já temos a próxima mensagem JSON completa nesse pacote
@@ -110,7 +110,7 @@ char *leitura(leitura_t *l) {
 		if (bytes_lidos <= 0) {
 			if (bytes_lidos == -1)
 				perror("leitura: read");
-			finaliza("{\"msg\":\"Leitura vazia\",\"fim\"}");
+			finaliza("{\"msg\":\"Leitura vazia\",\"fim\":null}");
 		}
 		
 		l->fim_pacote += bytes_lidos;
@@ -160,7 +160,7 @@ void* th_conecao_cliente(void *tmp) {
 	
 	if (json_all_parse(&json) < 0) {
 		fprintf(stderr, "Falha JSON parse\n");
-		finaliza("{\"msg\":\"Falha JSON parse\",\"fim\"}");
+		finaliza("{\"msg\":\"Falha JSON parse\",\"fim\":null}");
 	}
 	
 	#ifndef NAO_CHECA_SENHA
@@ -185,7 +185,7 @@ void* th_conecao_cliente(void *tmp) {
 		printf("Novo usuário, criando cadastro\nCódigo: %d\n", cod);
 		#ifndef NAO_ENVIA_EMAIL
 		if (envia_email(usuario, cod) == -1)
-			finaliza("{\"msg\":\"Falha no envio de e-mail de confirmação\",\"fim\"}");
+			finaliza("{\"msg\":\"Falha no envio de e-mail de confirmação\",\"fim\":null}");
 		#endif
 		envia_fixo("{\"ok\":true}");
 		
@@ -205,7 +205,7 @@ void* th_conecao_cliente(void *tmp) {
 			entrada_usuario = json_get_int(&json, "codigo");
 			
 			if (entrada_usuario == JSON_INVALID)
-				finaliza("{\"msg\":\"JSON: chave \"codigo\" não encontrada\",\"fim\"}");
+				finaliza("{\"msg\":\"JSON: chave \"codigo\" não encontrada\",\"fim\":null}");
 			
 			if (entrada_usuario != cod)
 				envia_fixo("{\"ok\":false}");
@@ -221,19 +221,19 @@ void* th_conecao_cliente(void *tmp) {
 		
 		const char *hash_senha = get_user(usuario);
 		if (hash_senha == NULL) {
-			finaliza("{\"msg\":\"Usuário não cadastrado\",\"fim\"}");
+			finaliza("{\"msg\":\"Usuário não cadastrado\",\"fim\":null}");
 		}
 		
 		/*
 		if (strcmp(hash_senha, hash)) {
 			printf("Falha de autenticação\n");
-			finaliza("{\"msg\":\"Falha de autenticação\",\"fim\"}");
+			finaliza("{\"msg\":\"Falha de autenticação\",\"fim\":null}");
 		}
 		*/
 		
 		if (senha_correta(hash_senha, str_hash, hash) == 0) {
 			printf("Falha de autenticação\n");
-			finaliza("{\"msg\":\"Falha de autenticação\",\"fim\"}");
+			finaliza("{\"msg\":\"Falha de autenticação\",\"fim\":null}");
 		}
 	}
 	#endif
@@ -272,9 +272,9 @@ void* th_conecao_cliente(void *tmp) {
 	} else {
 		int inicio, fim;
 		if ((inicio = json_get_int(&json, "inicio")) == JSON_INVALID)
-			finaliza("{\"msg\":\"Mensagem faltando ponto inicial\",\"fim\"}");
+			finaliza("{\"msg\":\"Mensagem faltando ponto inicial\",\"fim\":null}");
 		if ((fim = json_get_int(&json, "fim")) == JSON_INVALID)
-			finaliza("{\"msg\":\"Mensagem faltando ponto final\",\"fim\"}");
+			finaliza("{\"msg\":\"Mensagem faltando ponto final\",\"fim\":null}");
 		printf("Cruzando usuários...\n");
 		
 		
@@ -314,7 +314,7 @@ void* th_conecao_cliente(void *tmp) {
 					
 				default:
 					fprintf(stderr, "pthread_mutex_trylock: %d\n", falhou_lock);
-					finaliza("{\"msg\":\"Erro em pthread_mutex_tylock\",\"fim\"}");
+					finaliza("{\"msg\":\"Erro em pthread_mutex_tylock\",\"fim\":null}");
 			}
 		}
 	}

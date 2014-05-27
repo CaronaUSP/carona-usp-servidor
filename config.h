@@ -16,6 +16,6 @@
 ///@TODO: não deve ser uma constante
 #define MSG_NOVIDADES	"Projeto de graduação para melhorar a mobilidade na USP!"
 
-#define MSG_ERR_COMUNICACAO	"{\"msg\":\"Falha na comunicação com o servidor\",\"fim\"}"
+#define MSG_ERR_COMUNICACAO	"{\"msg\":\"Falha na comunicação com o servidor\",\"fim\":null}"
 
 #endif
