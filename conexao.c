@@ -14,12 +14,16 @@
 int s, clientes_agora = 0, clientes_total = 0, caronas_total = 0;
 int caminhos[MAX_CLIENTES][30];
 uint32_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
-pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER, mutex_comunicacao[MAX_CLIENTES] = {PTHREAD_MUTEX_INITIALIZER},
-				mutex_esperando_dar_carona[MAX_CLIENTES] = {PTHREAD_MUTEX_INITIALIZER};	///@TODO: isso é temporário
-
+pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER,
+				mutex_comunicacao[MAX_CLIENTES] = {PTHREAD_MUTEX_INITIALIZER},
+				mutex_comunicacao_recebe_carona[MAX_CLIENTES] = {PTHREAD_MUTEX_INITIALIZER},
+				mutex_esperando_dar_carona[MAX_CLIENTES] = {PTHREAD_MUTEX_INITIALIZER},	///@TODO: isso é temporário
+				mutex_recebe_carona[MAX_CLIENTES] = {PTHREAD_MUTEX_INITIALIZER},
+				busca = PTHREAD_MUTEX_INITIALIZER;
 int comm[MAX_CLIENTES];
 
-pthread_cond_t comunica_thread[MAX_CLIENTES];
+pthread_cond_t comunica_thread[MAX_CLIENTES] = {PTHREAD_COND_INITIALIZER},
+				comunica_thread_recebe_carona[MAX_CLIENTES] = {PTHREAD_COND_INITIALIZER};
 pthread_key_t dados_thread;
 int pilha_threads_livres[MAX_CLIENTES];
 pthread_t threads[MAX_CLIENTES];
@@ -85,7 +89,7 @@ char *leitura(leitura_t *l) {
 	
 	if (tsd == NULL) {
 		// Erro bem improvável (a chave foi inicializada em init.c), mas é bom tratá-lo aqui
-		printf("leitura: tsd não encontrada\n");
+		fprintf(stderr, "leitura: tsd não encontrada\n");
 		finaliza("{\"msg\":\"leitura(): TSD não encontrada\nIsso é um bug, reporte-o!!!\",\"fim\":null}");
 	}
 	
@@ -160,19 +164,21 @@ void* th_conecao_cliente(void *tmp) {
 	json.n_pairs = 200;
 	
 	if (json_all_parse(&json) < 0) {
-		fprintf(stderr, "Falha JSON parse\n");
+		fprintf(stderr, "%d: Falha JSON parse\n", tsd->n_thread);
 		finaliza("{\"msg\":\"Falha JSON parse\",\"fim\":null}");
 	}
 	
-	#ifndef NAO_CHECA_SENHA
 	if ((hash = json_get_str(&json, "hash")) == NULL) {
 		printf("Chave \"hash\" não encontrada\n");
 		pthread_exit(NULL);
 	}
+	
+	#ifndef NAO_CHECA_SENHA
 	if (strlen(hash) != 64) {
 		printf("Hash != 64 bytes!\n");
 		pthread_exit(NULL);
 	}
+	#endif
 	
 	usuario = json_get_str(&json, "usuario");
 	
@@ -232,12 +238,13 @@ void* th_conecao_cliente(void *tmp) {
 		}
 		*/
 		
+		#ifndef NAO_CHECA_SENHA
 		if (senha_correta(hash_senha, str_hash, hash) == 0) {
 			printf("Falha de autenticação\n");
 			finaliza("{\"msg\":\"Falha de autenticação\",\"fim\":null}");
 		}
+		#endif
 	}
-	#endif
 	
 	envia_fixo("{\"ok\":true}");	// autenticação OK
 	
@@ -250,7 +257,7 @@ void* th_conecao_cliente(void *tmp) {
 	
 	const char *pontos = json_get_array(&json, "pontos");
 	
-	int i;
+	int i, j, k;
 	
 	if (pontos != NULL) {
 		
@@ -263,8 +270,13 @@ void* th_conecao_cliente(void *tmp) {
 		}
 		
 		pthread_mutex_lock(&mutex_esperando_dar_carona[tsd->n_thread]);
+		
 		pthread_mutex_lock(&mutex_comunicacao[tsd->n_thread]);
 		pthread_cond_wait(&comunica_thread[tsd->n_thread], &mutex_comunicacao[tsd->n_thread]);
+		pthread_mutex_unlock(&mutex_comunicacao[tsd->n_thread]);
+		
+		
+		
 		
 		sprintf(mensagem, "{\"msg\":\"Thread %d receberá carona!\"}", comm[tsd->n_thread]);
 		finaliza(mensagem);
@@ -278,7 +290,61 @@ void* th_conecao_cliente(void *tmp) {
 			finaliza("{\"msg\":\"Mensagem faltando ponto final\",\"fim\":null}");
 		printf("Cruzando usuários...\n");
 		
+		pthread_mutex_lock(&busca);
 		
+		adiciona_fila(tsd->n_thread);
+		
+		for (;;) {
+			int compativeis = 0;
+			for (i = 0; i < MAX_CLIENTES; i++) {
+				int falhou_lock = pthread_mutex_trylock(&mutex_esperando_dar_carona[i]);
+				switch (falhou_lock) {
+				case 0:
+					pthread_mutex_unlock(&mutex_esperando_dar_carona[i]);
+					break;
+				case EBUSY:
+					for (j = 0; j < (int) sizeof(caminhos[0]); j++) {
+						if (caminhos[i][j] == inicio) {
+							for (k = j + 1; k < (int) sizeof(caminhos[0]); k++) {
+								if (caminhos[i][k] == fim) {
+									
+									printf("Compatível: %d, distância %d\n", i, k - j);
+									compativeis++;
+									break;
+									/*
+									comm[i] = tsd->n_thread;
+									pthread_cond_signal(&comunica_thread[i]);
+									sprintf(mensagem, "{\"msg\":\"Thread %d dará carona!\"}", i);
+									envia_str(mensagem);
+									*/
+								}
+							}
+						}
+					}
+					break;
+				case EINVAL:
+					fprintf(stderr, "pthread_mutex_trylock: EINVAL\n");
+					break;
+					
+				default:
+					fprintf(stderr, "pthread_mutex_trylock: %d\n", falhou_lock);
+				}
+			}
+			
+			if (compativeis) {
+				printf("%d compatíveis\n", compativeis);
+				remove_fila(tsd->n_thread);
+				break;
+			}
+			
+			pthread_mutex_lock(&mutex_comunicacao_recebe_carona[tsd->n_thread]);
+			pthread_cond_wait(&comunica_thread_recebe_carona[tsd->n_thread], &mutex_comunicacao_recebe_carona[tsd->n_thread]);
+			pthread_mutex_unlock(&mutex_comunicacao_recebe_carona[tsd->n_thread]);
+		}
+		
+		//mutex_recebe_carona;
+		
+		/*
 		int j, k;
 		for (i = 0; i < MAX_CLIENTES; i++) {
 			// Checa se thread está esperando alguém para dar carona:
@@ -292,21 +358,22 @@ void* th_conecao_cliente(void *tmp) {
 					
 				case EBUSY:
 					for (j = 0; j < (int) sizeof(caminhos[0]); j++) {
-							if (caminhos[i][j] == inicio) {
-								for (k = j + 1; k < (int) sizeof(caminhos[0]); k++) {
-									if (caminhos[i][k] == fim) {
-										pthread_mutex_lock(&mutex_comunicacao[i]);
-										if (caminhos[i][k] != fim)
-											continue;	// alguém conseguiu o mutex antes :(
-										comm[i] = tsd->n_thread;
-										pthread_cond_signal(&comunica_thread[i]);
-										pthread_mutex_unlock(&mutex_comunicacao[i]);
-										sprintf(mensagem, "{\"msg\":\"Thread %d dará carona!\"}", i);
-										finaliza(mensagem);
-									}
+						if (caminhos[i][j] == inicio) {
+							for (k = j + 1; k < (int) sizeof(caminhos[0]); k++) {
+								if (caminhos[i][k] == fim) {
+									pthread_mutex_lock(&mutex_comunicacao[i]);
+									if (caminhos[i][k] != fim)
+										continue;	// alguém conseguiu o mutex antes :(
+									comm[i] = tsd->n_thread;
+									pthread_cond_signal(&comunica_thread[i]);
+									pthread_mutex_unlock(&mutex_comunicacao[i]);
+									sprintf(mensagem, "{\"msg\":\"Thread %d dará carona!\"}", i);
+									envia_str(mensagem);
+									break;
 								}
 							}
 						}
+					}
 					break;
 				
 				case EINVAL:
@@ -318,7 +385,10 @@ void* th_conecao_cliente(void *tmp) {
 					finaliza("{\"msg\":\"Erro em pthread_mutex_tylock\",\"fim\":null}");
 			}
 		}
+		*/
 	}
+	
+	pthread_mutex_unlock(&busca);
 	
 	pthread_cleanup_pop(1);
 	return NULL;

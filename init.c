@@ -83,9 +83,7 @@ void inicializa(int argc, char **argv) {
 	int i;
 	for (i = 0; i < MAX_CLIENTES; i++) {
 		pilha_threads_livres[i] = i;
-		pthread_cond_init(&comunica_thread[i], NULL);
-		pthread_mutex_init(&mutex_comunicacao[i], NULL);
-		pthread_mutex_init(&mutex_esperando_dar_carona[i], NULL);
+		fila[MAX_CLIENTES].numero = -1;
 	}
 	
 	// mutex para atualização de dados comuns às threads
