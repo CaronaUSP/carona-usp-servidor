@@ -141,7 +141,8 @@ void* th_conecao_cliente(void *tmp) {
 	
 	sprintf(mensagem, "{\"login\":\"%s\"}""", str_hash);
 	envia(mensagem, strlen(mensagem) + 1);
-	
+	printf("Mensagem:\n%s\n", mensagem);
+  
 	char resposta[2000];
 	const char *hash, *usuario;
 	

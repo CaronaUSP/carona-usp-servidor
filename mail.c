@@ -17,7 +17,7 @@
 "Date: Sat, 17 May 2014 12:18:27 -0300\r\n"\
 "To: %s\r\n"\
 "From: " SMTP_EMAIL " (Carona Comunitária USP)\r\n"\
-"Reply-To: noreply@noreply.br\r\n"\
+"Reply-To: <noreply@noreply.br>\r\n"\
 "Subject: Confirmação de e-mail - Carona USP\r\n"\
 "\r\n"\
 "Obrigado pelo interesse no projeto Carona Comunitária USP!\r\n"\

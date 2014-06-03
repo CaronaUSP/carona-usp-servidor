@@ -214,6 +214,7 @@ void bp() {}	//para depuração
 #define try(cmd)	do {int __ret = (cmd); if (__ret < 0) return __ret;} while(0)
 #define try0(cmd)	do {if ((cmd) == NULL) return JSON_INVALID;} while(0)
 int json_all_parse(json_parser *json) {
+  printf("Info: JSON parse\n%s\n", json->start);
 	json->cur = json->start;
 	try(search_object(json));
 	
