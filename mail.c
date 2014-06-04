@@ -17,13 +17,13 @@
 "Date: Sat, 17 May 2014 12:18:27 -0300\r\n"\
 "To: %s\r\n"\
 "From: " SMTP_EMAIL " (Carona Comunitária USP)\r\n"\
-"Reply-To: noreply@noreply.br\r\n"\
-"Subject: Confirmação de e-mail\r\n"\
+"Reply-To: <noreply@noreply.br>\r\n"\
+"Subject: Confirmação de e-mail - Carona USP\r\n"\
 "\r\n"\
 "Obrigado pelo interesse no projeto Carona Comunitária USP!\r\n"\
-"O código para a criação de conta é %u.\r\n"\
+"O código para a criação da sua conta é %u.\r\n"\
 "\r\n"\
-"Nota: ignore esse e-mail se você não requisitou uma conta\r\n"
+"Aviso: Se você não requisitou uma conta, simplesmente ignore esse e-mail.\r\n"
 #define min(a, b)	a < b ? a : b
 
 
