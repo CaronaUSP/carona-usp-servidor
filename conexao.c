@@ -212,7 +212,7 @@ void* th_conecao_cliente(void *tmp) {
 			entrada_usuario = json_get_int(&json, "codigo");
 			
 			if (entrada_usuario == JSON_INVALID)
-				finaliza("{\"msg\":\"JSON: chave \"codigo\" não encontrada\",\"fim\":null}");
+				finaliza("{\"msg\":\"JSON: chave \\\"codigo\\\" não encontrada\",\"fim\":null}");
 			
 			if (entrada_usuario != cod)
 				envia_fixo("{\"ok\":false}");
