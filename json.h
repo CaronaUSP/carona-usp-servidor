@@ -35,7 +35,7 @@
 typedef struct {
 	const char *name;
 	int type;
-	const char *value;
+	char *value;
 } json_pair;
 
 typedef struct {
@@ -50,7 +50,7 @@ typedef struct {
 } json_value;
 
 void json_init(json_parser *json);
-const char *json_get_str(json_parser *json, const char *search);
+char *json_get_str(json_parser *json, const char *search);
 int json_all_parse(json_parser *json);
 int json_get_int(json_parser *json, const char *search);
 int json_get_bool(json_parser *json, const char *search);

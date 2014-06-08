@@ -34,7 +34,7 @@ endif
 # Defines que retiram algumas partes de código, úteis para teste:
 # NAO_CHECA_JA_CONECTADO: Permite várias conexões do mesmo IP
 # NAO_CHECA_SENHA: Não checa se o hash está correto
-DEFINES=-DNAO_CHECA_JA_CONECTADO -DSMTP_USER='"$(SMTP_USER)"' -DSMTP_PASSWORD='"$(SMTP_PASSWORD)"' -DSMTP_EMAIL='"$(SMTP_EMAIL)"' -DSMTP_ADDRESS='"$(SMTP_ADDRESS)"' -DCURL_MUTEX
+DEFINES=-DNAO_CHECA_JA_CONECTADO -DSMTP_USER='"$(SMTP_USER)"' -DSMTP_PASSWORD='"$(SMTP_PASSWORD)"' -DSMTP_EMAIL='"$(SMTP_EMAIL)"' -DSMTP_ADDRESS='"$(SMTP_ADDRESS)"' -DCURL_MUTEX -D_GNU_SOURCE
 # Flags para gerar objetos (usar OPTIMIZE no lugar de DBG ativa várias otimizações
 # e não inclui dados de depuração no executável):
 CFLAGS=-c -Wall -Wextra $(DBG) $(DEFINES)

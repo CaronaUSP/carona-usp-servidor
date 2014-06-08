@@ -18,23 +18,13 @@
 #include "fila_clientes.h"
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 #include <arpa/inet.h>
 
-#define th_error(msg)		do {fprintf(stderr, "Thread %d: %s error - %s\n", tsd->n_thread, msg, strerror(errno)); pthread_exit(NULL);} while(0)
+#define th_error(msg)		do {fprintf(stderr, "Thread %d: %s: %s\n", tsd->n_thread, msg, strerror(errno)); pthread_exit(NULL);} while(0)
 #define th_try(cmd,msg)		do {if ((cmd) == -1) {th_error(msg);}} while(0)
 #define th_try0(cmd,msg)	do {if ((cmd) == NULL) {th_error(msg);}} while(0)
 #define th_tryEOF(cmd,msg)	do {if ((cmd) == EOF) {th_error(msg);}} while(0)
-
-extern int s, clientes_agora, clientes_total, caronas_total;
-extern uint32_t conectados[MAX_CLIENTES];	// lista de IPs já conectados
-											///@WARN: 32 bits para IPv4 apenas
-extern pthread_mutex_t mutex_modifica_thread;
-extern pthread_mutex_t mutex_comunicacao[MAX_CLIENTES];
-extern pthread_mutex_t mutex_esperando_dar_carona[MAX_CLIENTES];
-
-extern pthread_cond_t comunica_thread[MAX_CLIENTES];
-extern pthread_key_t dados_thread;
-extern int pilha_threads_livres[MAX_CLIENTES];
 
 // Thread Specific Data Area - regiões alocadas para cada thread para
 // guardar variáveis da thread (se usássemos globais, haveria conflito entre
@@ -42,7 +32,9 @@ extern int pilha_threads_livres[MAX_CLIENTES];
 typedef struct {
 	int fd_con;		// file descriptor da conexão
 	int n_thread;	// número da thread
-	char *errmsg;
+	int pos_atual;	// posição do carro
+	int par, inicio, fim;
+	char *usuario, *placa;
 } tsd_t;
 
 typedef struct {
@@ -52,8 +44,22 @@ typedef struct {
 	size_t tamanho_area;
 } leitura_t;
 
+extern int s, clientes_agora, clientes_total, caronas_total;
+#ifndef NAO_CHECA_JA_CONECTADO
+extern __int128_t conectados[MAX_CLIENTES];	// lista de IPs já conectados
+#endif
+
+extern pthread_cond_t comunica_thread[MAX_CLIENTES];
+extern pthread_key_t dados_thread;
+extern int pilha_threads_livres[MAX_CLIENTES];
+extern tsd_t tsd[MAX_CLIENTES];
+
 inline int ja_conectado(const struct in_addr *ip);
-inline void aceita_conexao(tsd_t *tsd, const struct in_addr *ip);
+#ifndef NAO_CHECA_JA_CONECTADO
+inline void aceita_conexao(int fd_con, const struct in_addr *ip);
+#else
+inline void aceita_conexao(int fd_con);
+#endif
 void* th_conecao_cliente(void *tmp);
 
 __attribute__((noreturn))void pthread_exit(void *retval);

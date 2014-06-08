@@ -14,6 +14,7 @@
 #include "conexao.h"
 #include "mail.h"
 #include "database.h"
+#include "fila_clientes.h"
 #include <signal.h>
 #include <curl/curl.h>
 
