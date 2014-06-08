@@ -28,4 +28,10 @@
 #define tryEOF(cmd,msg)	do {if ((cmd) == EOF) {error(msg);}} while(0)
 #define SHA_256_DIGEST_LENGTH	32
 
+#ifndef NAO_CHECA_JA_CONECTADO
+#error NAO_CHECA_JA_CONECTADO não definido, mas versão atual só pode ser gerada com essa flag\
+ (tivemos uns problemas com IPv6, versões mais antigas no repositório suportam apenas IPv4).\
+ Rode "make clean" e tente novamente.
+#endif
+
 #endif

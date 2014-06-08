@@ -15,7 +15,6 @@ const char banco_de_dados[] = "database";
 // Se recebermos SIGINT, paramos o programa fechando as conexões.
 static void sig_handler(int __attribute__((unused)) signo) {
 		printf("I: Recebido SIGINT\n");
-		pthread_mutex_destroy(&mutex_modifica_thread);
 		close(s);
 		///@TODO: limpeza decente dos recursos utilizados
 		FILE *dados = fopen(".dados", "w");
@@ -83,11 +82,7 @@ void inicializa(int argc, char **argv) {
 	int i;
 	for (i = 0; i < MAX_CLIENTES; i++) {
 		pilha_threads_livres[i] = i;
-		fila[MAX_CLIENTES].numero = -1;
 	}
-	
-	// mutex para atualização de dados comuns às threads
-	pthread_mutex_init(&mutex_modifica_thread, NULL);
 	
 	
 	// Cria TSD (thread specific area), regiões alocadas para cada thread para
@@ -112,5 +107,7 @@ void inicializa(int argc, char **argv) {
 		printf("%s - %s\n", user->email, user->hash);
 		user = user->next;
 	}
+	
+	inicializa_fila();
 	
 }

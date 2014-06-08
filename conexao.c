@@ -12,40 +12,29 @@
 #include "json.h"
 #include "conexao_helper.h"
 
-///@TODO: arrumar isso, tem muita coisa alocada junto
-int s, clientes_agora = 0, clientes_total = 0, caronas_total = 0;
-int caminhos[MAX_CLIENTES][30], esperando_dar_carona[MAX_CLIENTES] = {0}, pos_atual[MAX_CLIENTES] = {0};
-uint32_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
-pthread_mutex_t mutex_modifica_thread = PTHREAD_MUTEX_INITIALIZER,
-				mutex_recebe_carona[MAX_CLIENTES] = {PTHREAD_MUTEX_INITIALIZER};
-int comm[MAX_CLIENTES], fd[MAX_CLIENTES];
-
-pthread_key_t dados_thread;
-int pilha_threads_livres[MAX_CLIENTES];
-char *usuario_da_carona, *placa[MAX_CLIENTES];
-
 
 void* th_conecao_cliente(void *tmp) {
 	tsd_t *tsd = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
-								// então precisamos marcar o tipo de ponteiro recebido ou usar casts
+						// então precisamos marcar o tipo de ponteiro recebido ou usar casts
 	leitura_t l;
+	char resposta[2000];
+	const char *hash, *usuario;
+	
 	pthread_setspecific(dados_thread, tmp);
-  fd[tsd->n_thread] = tsd->fd_con;
+	fd[tsd->n_thread] = tsd->fd_con;
 	pthread_cleanup_push((void *)th_limpeza, tmp);
 	printf("Thread criada, fd = %d, n = %d\n", tsd->fd_con, tsd->n_thread);
 	char str_hash[500];
 	char mensagem[1000];	///@FIXME: assume que dados cabem em 1000 bytes
 	
-	pthread_mutex_lock(&processando);
+	adquire_mutex();
 	sprintf(str_hash, "Carona Comunitária USP\n%s\n%d clientes já conectados, %d atualmente, %d caronas dadas",
 				MSG_NOVIDADES, clientes_total, clientes_agora, caronas_total);
 	
 	sprintf(mensagem, "{\"login\":\"%s\"}""", str_hash);
 	envia(mensagem, strlen(mensagem) + 1);
-	printf("Mensagem:\n%s\n", mensagem);
+	printf("%d - Mensagem:\n%s\n", tsd->n_thread, mensagem);
   
-	char resposta[2000];
-	const char *hash, *usuario;
 	
 	///@FIXME: aceita mensagens até 1024 bytes, senão as corta
 	l.area = resposta;
@@ -59,17 +48,17 @@ void* th_conecao_cliente(void *tmp) {
 	json.pairs = pairs;
 	json.n_pairs = 200;
 	
-  recebe_dados(&l, &json);
+	recebe_dados(&l, &json);
 	
 	if ((hash = json_get_str(&json, "hash")) == NULL) {
 		printf("Chave \"hash\" não encontrada\n");
-		pthread_exit(NULL);
+		finaliza("{\"msg\":\"JSON: chave \\\"hash\\\" não encontrada\",\"fim\":null}");
 	}
 	
 	#ifndef NAO_CHECA_SENHA
 	if (strlen(hash) != 64) {
 		printf("Hash != 64 bytes!\n");
-		pthread_exit(NULL);
+		finaliza("{\"msg\":\"JSON: chave \\\"hash\\\" inválida\",\"fim\":null}");
 	}
 	#endif
 	
@@ -77,7 +66,7 @@ void* th_conecao_cliente(void *tmp) {
 	
 	if (usuario == NULL) {
 		printf("Chave \"usuario\" não encontrada\n");
-		pthread_exit(NULL);
+		finaliza("{\"msg\":\"JSON: chave \\\"usuario\\\" não encontrada\",\"fim\":null}");
 	}
 	
 	if (json_get_null(&json, "cadastro") != JSON_INVALID) {	// Existe o par cadastro
@@ -89,14 +78,14 @@ void* th_conecao_cliente(void *tmp) {
 		#endif
 		envia_fixo("{\"ok\":true}");
 		
-		char usuario_salvo[250], hash_salvo[33];
+		char usuario_salvo[250], hash_salvo[65];
 		strncpy(usuario_salvo, usuario, sizeof(usuario_salvo));
 		usuario_salvo[sizeof(usuario_salvo) - 1] = 0;
 		strncpy(hash_salvo, hash, sizeof(hash_salvo));
 		hash_salvo[sizeof(hash_salvo) - 1] = 0;
 		
 		do {
-      recebe_dados(&l, &json);
+			recebe_dados(&l, &json);
 			
 			entrada_usuario = json_get_int(&json, "codigo");
 			
@@ -111,36 +100,38 @@ void* th_conecao_cliente(void *tmp) {
 		add_user(usuario_salvo, hash_salvo);
 		
 	} else {
+		#ifndef NAO_CHECA_SENHA
 		for (;;) {
-      const char *hash_senha = get_user(usuario);
-      if (hash_senha == NULL) {
-        finaliza("{\"msg\":\"Usuário não cadastrado\",\"fim\":null}");
-      }
-      
-      
-      #ifndef NAO_CHECA_SENHA
-      if (senha_correta(hash_senha, str_hash, hash) == 0)
-        envia_fixo("{\"ok\":false}");
-      else
-      #endif
-        break;
-    }
+			const char *hash_senha = get_user(usuario);
+			if (hash_senha == NULL) {
+				finaliza("{\"msg\":\"Usuário não cadastrado\",\"fim\":null}");
+			}
+			
+			if (senha_correta(hash_senha, str_hash, hash))
+				break;
+			envia_fixo("{\"ok\":false}");
+			recebe_dados(&l, &json);		// tentar novamente
+		}
+		#endif
 	}
 	
 	envia_fixo("{\"ok\":true}");	// autenticação OK
 	
-  recebe_dados(&l, &json);
+	recebe_dados(&l, &json);
 	
 	const char *pontos = json_get_array(&json, "pontos");
-  pthread_mutex_lock(&processando);
 	
-	int i, j, k;
-	
+	int i;
 	if (pontos != NULL) {
 		
 		int prox_ponto;
-    placa[tsd->n_thread] = json_get_str(&json, "placa");
-    pos_atual[tsd->n_thread] = 0;
+		char *placa_recebida;
+		adiciona_fila(tsd->n_thread, FILA_DA_CARONA);
+		placa_recebida = json_get_str(&json, "placa");
+		if (placa_recebida == NULL)
+			finaliza("{\"msg\":\"Chave \\\"placa\\\" não encontrada\", \"fim\":null}");
+		placa[tsd->n_thread] = placa_recebida;
+		pos_atual[tsd->n_thread] = 0;
 		for (i = 0; i < (int) sizeof(caminhos[0]); i++) {
 			if ((prox_ponto = json_array_i(pontos, i)) == JSON_INVALID)
 				break;
@@ -148,15 +139,14 @@ void* th_conecao_cliente(void *tmp) {
 			caminhos[tsd->n_thread][i] = prox_ponto;
 		}
 		
-    esperando_dar_carona[tsd->n_thread] = 1;    ///@TODO: # assentos livres, pode ser > 1 por carro
-    
-    for (;;) {
-      recebe_dados(&l, &json);
-      if ((pos_atual[tsd->n_thread] = json_get_int(&json, "proximo")) == JSON_INVALID) {
-        finaliza("{\"msg\":\"Chave \"proximo\" não encontrada\", \"fim\":null}");
-      }
-    }
-    
+		envia_fixo("{\"ok\":true}");
+		
+		for (;;) {
+			recebe_dados(&l, &json);
+			if ((pos_atual[tsd->n_thread] = json_get_int(&json, "proximo")) == JSON_INVALID)
+				finaliza("{\"msg\":\"Chave \\\"proximo\\\" não encontrada\", \"fim\":null}");
+		}
+		
 		sprintf(mensagem, "{\"msg\":\"Thread %d receberá carona!\"}", comm[tsd->n_thread]);
 		finaliza(mensagem);
 		
@@ -167,47 +157,41 @@ void* th_conecao_cliente(void *tmp) {
 			finaliza("{\"msg\":\"Mensagem faltando ponto inicial\",\"fim\":null}");
 		if ((fim = json_get_int(&json, "fim")) == JSON_INVALID)
 			finaliza("{\"msg\":\"Mensagem faltando ponto final\",\"fim\":null}");
+		
+		envia_fixo("{\"ok\":true}");
+		
 		printf("Cruzando usuários...\n");
 		
-		adiciona_fila(tsd->n_thread);
+		adiciona_fila(tsd->n_thread, FILA_RECEBE_CARONA);
 		
 		for (;;) {
-			int compativeis = 0;
-			for (i = 0; i < MAX_CLIENTES; i++) {
-				if (esperando_dar_carona[i]) {
-					for (j = 0; j < (int) sizeof(caminhos[0]); j++) {
-						if (caminhos[i][j] == inicio) {
-							for (k = j + 1; k < (int) sizeof(caminhos[0]); k++) {
-								if (caminhos[i][k] == fim) {
-									
-									printf("Compatível: %d, distância %d\n", i, k - j);
-									compativeis++;
-									break;
-									/*
-									comm[i] = tsd->n_thread;
-									pthread_cond_signal(&comunica_thread_da_carona[i]);
-									sprintf(mensagem, "{\"msg\":\"Thread %d dará carona!\"}", i);
-									envia_str(mensagem);
-									*/
-								}
-							}
-						}
+			int compativeis = 0, id_menor = -1, d_menor = 1000, d_atual, comparar_com = -1;
+			
+			while ((comparar_com = prox_fila(comparar_com)) != -1) {
+				printf("Comparando com %d\n", comparar_com);
+				d_atual = distancia(comparar_com, inicio, fim);
+				if (d_atual != -1) {  // caminho compatível
+					compativeis++;
+					if (d_atual < d_menor) {
+						d_menor = d_atual;
+						id_menor = comparar_com;
 					}
-        }
+				}
 			}
 			
 			if (compativeis) {
-				printf("%d compatíveis\n", compativeis);
-				remove_fila(tsd->n_thread);
+				printf("%d compatíveis, id %d é o melhor\n", compativeis, id_menor);
+				printf("FAZER ALGO AQUI\n");
 				break;
+			} else {
+				printf("Ninguém compatível\n");
 			}
 			
-			//pthread_mutex_lock(&mutex_comunicacao_recebe_carona[tsd->n_thread]);
-			//pthread_cond_wait(&comunica_thread_recebe_carona[tsd->n_thread], &mutex_comunicacao_recebe_carona[tsd->n_thread]);
-			//pthread_mutex_unlock(&mutex_comunicacao_recebe_carona[tsd->n_thread]);
+			recebe_dados(&l, &json);
 		}
 	}
 	
 	pthread_cleanup_pop(1);
 	return NULL;
 }
+

@@ -8,8 +8,6 @@
  * Funções para o banco de dados de usuários
 *******************************************************************************/
 
-#define _GNU_SOURCE
-
 #include "database.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,10 +77,24 @@ int init_db(const char *arquivo) {
 	return -1;
 }
 
+static usuario_t *get_user_struct(const char *email) {
+	usuario_t *prox = primeiro_usuario;
+	while (prox != NULL){
+		if (!strcmp(prox->email, email))
+			return prox;
+		prox = prox->next;
+	}
+	return NULL;
+}
+
 int add_user(const char *email, const char *hash) {
-	///@TODO: se usuário já existe, enviar e-mail caso o usuário tenha
-	/// esquecido a senha e substituir entrada antiga
 	usuario_t *novo;
+	
+	if ((novo = get_user_struct(email)) != NULL) {		// já existe
+		printf("Usuário %s já existe, atualizando senha\n", email);
+		strncpy((char *) novo->hash, hash, 64);
+	}
+	
 	novo = malloc(sizeof(usuario_t));
 	if (novo == NULL)
 		return -1;
@@ -100,13 +112,11 @@ int add_user(const char *email, const char *hash) {
 }
 
 const char *get_user(const char *email) {
-	usuario_t *prox = primeiro_usuario;
-	while (prox != NULL){
-		if (!strcmp(prox->email, email))
-			return prox->hash;
-		prox = prox->next;
-	}
-	return NULL;
+	usuario_t *prox;
+	prox = get_user_struct(email);
+	if (prox == NULL)
+		return NULL;
+	return prox->hash;
 }
 
 void save_db(const char *arquivo) {

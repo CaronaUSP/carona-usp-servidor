@@ -12,7 +12,21 @@
 #define __CONEXAO_HELPER_H__
 
 pthread_t threads[MAX_CLIENTES];
-pthread_mutex_t processando = PTHREAD_MUTEX_INITIALIZER;  // o código não está muito confiável  
+// Está como ERRORCHECK pela função th_limpeza. A maior parte do código
+// a chama com o mutex já adquirido, mas leitura() a chama sem adquirí-lo.
+pthread_mutex_t processando = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
+///@TODO: arrumar isso, tem muita coisa declarada junto
+int s, clientes_agora = 0, clientes_total = 0, caronas_total = 0;
+int caminhos[MAX_CLIENTES][30], pos_atual[MAX_CLIENTES] = {0};
+#ifndef NAO_CHECA_JA_CONECTADO
+__int128_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
+#endif
+int comm[MAX_CLIENTES], fd[MAX_CLIENTES];
+
+pthread_key_t dados_thread;
+int pilha_threads_livres[MAX_CLIENTES];
+char *usuario_da_carona, *placa[MAX_CLIENTES];
+tsd_t tsd[MAX_CLIENTES];
 
 // Algumas constantes para facilitar o código
 // Envia pela thread atual:
@@ -23,12 +37,28 @@ pthread_mutex_t processando = PTHREAD_MUTEX_INITIALIZER;  // o código não est�
 #define envia_fixo(objeto)	envia(objeto, sizeof(objeto))
 #define finaliza(msg)		do{envia_str(msg); pthread_exit(NULL);}while(0)
 
+void adquire_mutex() {
+	tsd_t *tsd = pthread_getspecific(dados_thread);
+	
+	printf("%d - pedindo mutex\n", tsd->n_thread);
+	pthread_mutex_lock(&processando);
+	printf("%d - adquiriu mutex\n", tsd->n_thread);
+	
+}
+
+void solta_mutex() {
+	tsd_t *tsd = pthread_getspecific(dados_thread);
+	
+	printf("%d - soltando mutex\n", tsd->n_thread);
+	pthread_mutex_unlock(&processando);
+	
+}
 
 #ifndef NAO_CHECA_JA_CONECTADO
 inline int ja_conectado(const struct in_addr *ip) {
 	int i;
 	for (i = 0; i < MAX_CLIENTES; i++) {
-		if (conectados[i] == *(uint32_t *)ip) {
+		if (conectados[i] == *(__int128_t *)ip) {
 			return 1;
 		}
 	}
@@ -36,31 +66,45 @@ inline int ja_conectado(const struct in_addr *ip) {
 }
 #endif
 
-inline void aceita_conexao(tsd_t *tsd, const struct in_addr *ip) {
+
+#ifndef NAO_CHECA_JA_CONECTADO
+inline void aceita_conexao(int fd_con, const struct in_addr *ip) {
+#else
+inline void aceita_conexao(int fd_con) {
+#endif
 	
-	pthread_mutex_lock(&mutex_modifica_thread);
-	tsd->n_thread = pilha_threads_livres[clientes_agora];
+	int n_thread;
+	pthread_mutex_lock(&processando);
+	n_thread = pilha_threads_livres[clientes_agora];
+	#ifndef NAO_CHECA_JA_CONECTADO
 	conectados[clientes_agora] = *(uint32_t *)ip;
+	#endif
 	clientes_agora++;
 	clientes_total++;
-	pthread_mutex_unlock(&mutex_modifica_thread);
 	
-	pthread_create(&threads[tsd->n_thread], NULL, th_conecao_cliente, tsd);	// free() de argumentos será pela thread
+	tsd[n_thread].n_thread = n_thread;	///@TODO: ao invés de salvar n_thread na tsd, dá pra recuperar calculando o índice da entrada
+	tsd[n_thread].fd_con = fd_con;
+	
+	pthread_mutex_unlock(&processando);
+	
+	pthread_create(&threads[tsd->n_thread], NULL, th_conecao_cliente, &tsd[n_thread]);	// free() de argumentos será pela thread
 	pthread_detach(threads[tsd->n_thread]);			// não receber retorno e liberar recursos ao final da execução
 }
 
 // Limpeza de recursos ao terminar thread
 void* th_limpeza(void *tmp) {
 	tsd_t *tsd = tmp;
-	pthread_mutex_unlock(&processando);
-	pthread_mutex_lock(&mutex_modifica_thread);
+	adquire_mutex();
 	clientes_agora--;
+	#ifndef NAO_CHECA_JA_CONECTADO
 	conectados[tsd->n_thread] = 0;
+	#endif
+	fila[tsd->n_thread].tipo = -1;
 	pilha_threads_livres[clientes_agora] = tsd->n_thread;
-	pthread_mutex_unlock(&mutex_modifica_thread);
+	remove_fila(tsd->n_thread);
 	printf("Thread %d: disconexão\n", tsd->n_thread);
 	close(tsd->fd_con);
-	free(tsd);
+	solta_mutex();
 	return NULL;
 }
 
@@ -116,14 +160,35 @@ char *leitura(leitura_t *l) {
 }
 
 void recebe_dados(leitura_t *l, json_parser *json) {
-  pthread_mutex_unlock(&processando);
-	leitura(l);
+	solta_mutex();
+	json->start = leitura(l);
 	if (json_all_parse(json) < 0) {
-    tsd_t *tsd = pthread_getspecific(dados_thread);
+		tsd_t *tsd = pthread_getspecific(dados_thread);
 		fprintf(stderr, "%d: Falha JSON parse\n", tsd->n_thread);
 		finaliza("{\"msg\":\"Falha JSON parse\",\"fim\":null}");
 	}
-  pthread_mutex_lock(&processando);
+	adquire_mutex();
+}
+
+int distancia(int da_carona, int inicio, int fim) {
+	int i, j;
+	printf("%d %d %d\n", da_carona, inicio, fim);
+	if (fila[da_carona].tipo != FILA_DA_CARONA)
+		return -1;
+	
+	for (i = 0; i < (int) sizeof(caminhos[0]); i++) {
+		if (caminhos[da_carona][i] == inicio) {
+			printf("inicio match\n");
+			for (j = i + 1; j < (int) sizeof(caminhos[0]); j++) {
+				if (caminhos[da_carona][j] == fim) {
+					printf("Compatível: %d, distância %d\n", da_carona, j - i);
+					return j - i;
+				}
+			}
+			break;
+		}
+	}
+	return -1;
 }
 
 #endif
