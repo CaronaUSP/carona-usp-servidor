@@ -21,12 +21,12 @@ int caminhos[MAX_CLIENTES][30], pos_atual[MAX_CLIENTES] = {0};
 #ifndef NAO_CHECA_JA_CONECTADO
 __int128_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
 #endif
-int comm[MAX_CLIENTES], fd[MAX_CLIENTES];
+int comm[MAX_CLIENTES];
 
 pthread_key_t dados_thread;
 int pilha_threads_livres[MAX_CLIENTES];
 char *usuario_da_carona, *placa[MAX_CLIENTES];
-tsd_t tsd[MAX_CLIENTES];
+tsd_t tsd_array[MAX_CLIENTES];
 
 // Algumas constantes para facilitar o código
 // Envia pela thread atual:
@@ -36,6 +36,13 @@ tsd_t tsd[MAX_CLIENTES];
 // Envia variável com tamanho fixo pela thread atual:
 #define envia_fixo(objeto)	envia(objeto, sizeof(objeto))
 #define finaliza(msg)		do{envia_str(msg); pthread_exit(NULL);}while(0)
+
+// Envia por outra thread:
+#define envia_outro(thread, msg, len)		th_try(write(tsd_array[thread].fd_con, msg, len), "write")
+// Envia string por outra thread:
+#define envia_str_outro(thread, str)		envia_outro(thread, str, strlen(str) + 1)
+// Envia variável com tamanho fixo ppor outra thread:
+#define envia_fixo_outro(thread, objeto)	envia_outro(thread, objeto, sizeof(objeto))
 
 void adquire_mutex() {
 	tsd_t *tsd = pthread_getspecific(dados_thread);
@@ -82,13 +89,13 @@ inline void aceita_conexao(int fd_con) {
 	clientes_agora++;
 	clientes_total++;
 	
-	tsd[n_thread].n_thread = n_thread;	///@TODO: ao invés de salvar n_thread na tsd, dá pra recuperar calculando o índice da entrada
-	tsd[n_thread].fd_con = fd_con;
+	tsd_array[n_thread].n_thread = n_thread;	///@TODO: ao invés de salvar n_thread na tsd, dá pra recuperar calculando o índice da entrada
+	tsd_array[n_thread].fd_con = fd_con;
 	
 	pthread_mutex_unlock(&processando);
 	
-	pthread_create(&threads[tsd->n_thread], NULL, th_conecao_cliente, &tsd[n_thread]);	// free() de argumentos será pela thread
-	pthread_detach(threads[tsd->n_thread]);			// não receber retorno e liberar recursos ao final da execução
+	pthread_create(&threads[n_thread], NULL, th_conecao_cliente, &tsd_array[n_thread]);	// free() de argumentos será pela thread
+	pthread_detach(threads[n_thread]);			// não receber retorno e liberar recursos ao final da execução
 }
 
 // Limpeza de recursos ao terminar thread
@@ -178,7 +185,6 @@ int distancia(int da_carona, int inicio, int fim) {
 	
 	for (i = 0; i < (int) sizeof(caminhos[0]); i++) {
 		if (caminhos[da_carona][i] == inicio) {
-			printf("inicio match\n");
 			for (j = i + 1; j < (int) sizeof(caminhos[0]); j++) {
 				if (caminhos[da_carona][j] == fim) {
 					printf("Compatível: %d, distância %d\n", da_carona, j - i);
@@ -189,6 +195,29 @@ int distancia(int da_carona, int inicio, int fim) {
 		}
 	}
 	return -1;
+}
+
+void compara(comparador_t *compara) {
+	int comparar_com = -1, d_menor = 2000, i, d_atual;
+	compara->melhor = -1;
+	while ((comparar_com = prox_fila(comparar_com)) != -1) {
+		printf("Comparando com %d\n", comparar_com);
+		d_atual = distancia(comparar_com, compara->inicio, compara->fim);
+		if (d_atual != -1) {  // caminho compatível
+			if (d_atual < d_menor) {
+				d_menor = d_atual;
+				compara->melhor = comparar_com;
+			}
+		}
+	}
+	// seta ponto de parada:
+	if (compara->melhor != -1) {
+		for (i = 1; i < (int) sizeof(caminhos[0]); i++) {
+			if (caminhos[compara->melhor][i] == compara->fim) {
+				compara->parar = i;
+			}
+		}
+	}
 }
 
 #endif

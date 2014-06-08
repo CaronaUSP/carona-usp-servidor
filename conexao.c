@@ -21,7 +21,6 @@ void* th_conecao_cliente(void *tmp) {
 	const char *hash, *usuario;
 	
 	pthread_setspecific(dados_thread, tmp);
-	fd[tsd->n_thread] = tsd->fd_con;
 	pthread_cleanup_push((void *)th_limpeza, tmp);
 	printf("Thread criada, fd = %d, n = %d\n", tsd->fd_con, tsd->n_thread);
 	char str_hash[500];
@@ -152,10 +151,10 @@ void* th_conecao_cliente(void *tmp) {
 		
 		
 	} else {
-		int inicio, fim;
-		if ((inicio = json_get_int(&json, "inicio")) == JSON_INVALID)
+		comparador_t comparador;
+		if ((comparador.inicio = json_get_int(&json, "inicio")) == JSON_INVALID)
 			finaliza("{\"msg\":\"Mensagem faltando ponto inicial\",\"fim\":null}");
-		if ((fim = json_get_int(&json, "fim")) == JSON_INVALID)
+		if ((comparador.fim = json_get_int(&json, "fim")) == JSON_INVALID)
 			finaliza("{\"msg\":\"Mensagem faltando ponto final\",\"fim\":null}");
 		
 		envia_fixo("{\"ok\":true}");
@@ -165,26 +164,15 @@ void* th_conecao_cliente(void *tmp) {
 		adiciona_fila(tsd->n_thread, FILA_RECEBE_CARONA);
 		
 		for (;;) {
-			int compativeis = 0, id_menor = -1, d_menor = 1000, d_atual, comparar_com = -1;
 			
-			while ((comparar_com = prox_fila(comparar_com)) != -1) {
-				printf("Comparando com %d\n", comparar_com);
-				d_atual = distancia(comparar_com, inicio, fim);
-				if (d_atual != -1) {  // caminho compatível
-					compativeis++;
-					if (d_atual < d_menor) {
-						d_menor = d_atual;
-						id_menor = comparar_com;
-					}
-				}
-			}
+			compara(&comparador);
 			
-			if (compativeis) {
-				printf("%d compatíveis, id %d é o melhor\n", compativeis, id_menor);
-				printf("FAZER ALGO AQUI\n");
-				break;
+			if (comparador.melhor != -1) {
+				sprintf(mensagem, "{\"parar\":%d}", comparador.parar);
+				envia_str_outro(comparador.melhor, mensagem);
 			} else {
 				printf("Ninguém compatível\n");
+				printf("IMPLEMENTE ISSO\n");
 			}
 			
 			recebe_dados(&l, &json);

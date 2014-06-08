@@ -41,6 +41,10 @@ typedef struct {
 	size_t tamanho_area;
 } leitura_t;
 
+typedef struct {
+	int inicio, fim, melhor, parar;
+} comparador_t;
+
 extern int s, clientes_agora, clientes_total, caronas_total;
 #ifndef NAO_CHECA_JA_CONECTADO
 extern __int128_t conectados[MAX_CLIENTES];	// lista de IPs já conectados
