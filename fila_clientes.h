@@ -16,6 +16,7 @@
 #define FILA_DA_CARONA		0
 #define FILA_RECEBE_CARONA	1
 #define FILA_RECEBE_CARONA_PAREADO	2
+#define FILA_DA_CARONA_PAREADO	3
 
 void inicializa_fila();
 void adiciona_fila(int n, int tipo);

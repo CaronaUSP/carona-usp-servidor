@@ -28,7 +28,7 @@ int main (int argc, char **argv) {
 			if (clientes_agora < MAX_CLIENTES)
 				break;
 			// Se atingiu limite:
-			write(fd_con, "{\"msg\":\"Número máximo de clientes atingido\",\"fim\":null}", sizeof("{\"msg\":\"Número máximo de clientes atingido\",\"fim\":null}"));
+			write(fd_con, "{\"msg\":\"Número máximo de clientes atingido\"}", sizeof("{\"msg\":\"Número máximo de clientes atingido\"}"));
 			close(fd_con);
 		}
 		char ip[64];

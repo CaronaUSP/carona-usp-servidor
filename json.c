@@ -241,7 +241,7 @@ int json_all_parse(json_parser *json) {
 					try0(json->pairs[obj_n].value = json_getstr(json));
 					break;
 				case JSON_NUMBER:
-					printf("Recebido número, assumindo como inteiro (float ainda não é suportado!)\n");
+					printf("Recebido número, assumindo como inteiro\n");
 					json->pairs[obj_n].value = json->cur;
 					try(json_parse_int(json));
 					break;

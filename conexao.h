@@ -18,6 +18,7 @@
 #include "fila_clientes.h"
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 #include <arpa/inet.h>
 
 #define th_error(msg)		do {fprintf(stderr, "Thread %d: %s: %s\n", tsd->n_thread, msg, strerror(errno)); pthread_exit(NULL);} while(0)
@@ -31,7 +32,9 @@
 typedef struct {
 	int fd_con;		// file descriptor da conexão
 	int n_thread;	// número da thread
-	char *usuario;
+	int pos_atual;	// posição do carro
+	int par, inicio, fim;
+	char *usuario, *placa;
 } tsd_t;
 
 typedef struct {
@@ -40,10 +43,6 @@ typedef struct {
 	char *area, *fim_msg, *fim_pacote;
 	size_t tamanho_area;
 } leitura_t;
-
-typedef struct {
-	int inicio, fim, melhor, parar;
-} comparador_t;
 
 extern int s, clientes_agora, clientes_total, caronas_total;
 #ifndef NAO_CHECA_JA_CONECTADO

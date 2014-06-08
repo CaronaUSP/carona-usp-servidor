@@ -19,12 +19,14 @@ void* th_conecao_cliente(void *tmp) {
 	leitura_t l;
 	char resposta[2000];
 	const char *hash, *usuario;
+	char str_hash[500];
+	char mensagem[1000];	///@FIXME: assume que dados cabem em 1000 bytes
+	json_parser json;
+	json_pair pairs[200];
 	
 	pthread_setspecific(dados_thread, tmp);
 	pthread_cleanup_push((void *)th_limpeza, tmp);
 	printf("Thread criada, fd = %d, n = %d\n", tsd->fd_con, tsd->n_thread);
-	char str_hash[500];
-	char mensagem[1000];	///@FIXME: assume que dados cabem em 1000 bytes
 	
 	adquire_mutex();
 	sprintf(str_hash, "Carona Comunitária USP\n%s\n%d clientes já conectados, %d atualmente, %d caronas dadas",
@@ -41,23 +43,23 @@ void* th_conecao_cliente(void *tmp) {
 	l.fim_msg = resposta - 1;
 	l.tamanho_area = sizeof(resposta);
 	
-	json_parser json;
-	json_pair pairs[200];
 	json.start = resposta;
 	json.pairs = pairs;
 	json.n_pairs = 200;
+	
+	tsd->par = -1;
 	
 	recebe_dados(&l, &json);
 	
 	if ((hash = json_get_str(&json, "hash")) == NULL) {
 		printf("Chave \"hash\" não encontrada\n");
-		finaliza("{\"msg\":\"JSON: chave \\\"hash\\\" não encontrada\",\"fim\":null}");
+		finaliza("{\"msg\":\"JSON: chave \\\"hash\\\" não encontrada\"}");
 	}
 	
 	#ifndef NAO_CHECA_SENHA
 	if (strlen(hash) != 64) {
 		printf("Hash != 64 bytes!\n");
-		finaliza("{\"msg\":\"JSON: chave \\\"hash\\\" inválida\",\"fim\":null}");
+		finaliza("{\"msg\":\"JSON: chave \\\"hash\\\" inválida\"}");
 	}
 	#endif
 	
@@ -65,7 +67,7 @@ void* th_conecao_cliente(void *tmp) {
 	
 	if (usuario == NULL) {
 		printf("Chave \"usuario\" não encontrada\n");
-		finaliza("{\"msg\":\"JSON: chave \\\"usuario\\\" não encontrada\",\"fim\":null}");
+		finaliza("{\"msg\":\"JSON: chave \\\"usuario\\\" não encontrada\"}");
 	}
 	
 	if (json_get_null(&json, "cadastro") != JSON_INVALID) {	// Existe o par cadastro
@@ -73,7 +75,7 @@ void* th_conecao_cliente(void *tmp) {
 		printf("Novo usuário, criando cadastro\nCódigo: %d\n", cod);
 		#ifndef NAO_ENVIA_EMAIL
 		if (envia_email(usuario, cod) == -1)
-			finaliza("{\"msg\":\"Falha no envio de e-mail de confirmação\",\"fim\":null}");
+			finaliza("{\"msg\":\"Falha no envio de e-mail de confirmação\"}");
 		#endif
 		envia_fixo("{\"ok\":true}");
 		
@@ -89,7 +91,7 @@ void* th_conecao_cliente(void *tmp) {
 			entrada_usuario = json_get_int(&json, "codigo");
 			
 			if (entrada_usuario == JSON_INVALID)
-				finaliza("{\"msg\":\"JSON: chave \\\"codigo\\\" não encontrada\",\"fim\":null}");
+				finaliza("{\"msg\":\"JSON: chave \\\"codigo\\\" não encontrada\"}");
 			
 			if (entrada_usuario != cod)
 				envia_fixo("{\"ok\":false}");
@@ -103,7 +105,7 @@ void* th_conecao_cliente(void *tmp) {
 		for (;;) {
 			const char *hash_senha = get_user(usuario);
 			if (hash_senha == NULL) {
-				finaliza("{\"msg\":\"Usuário não cadastrado\",\"fim\":null}");
+				finaliza("{\"msg\":\"Usuário não cadastrado\"}");
 			}
 			
 			if (senha_correta(hash_senha, str_hash, hash))
@@ -123,27 +125,74 @@ void* th_conecao_cliente(void *tmp) {
 	int i;
 	if (pontos != NULL) {
 		
-		int prox_ponto;
-		char *placa_recebida;
+		int prox_ponto, posicao;
+		char *placa_recebida, placa[9] = {0};
 		adiciona_fila(tsd->n_thread, FILA_DA_CARONA);
 		placa_recebida = json_get_str(&json, "placa");
 		if (placa_recebida == NULL)
 			finaliza("{\"msg\":\"Chave \\\"placa\\\" não encontrada\", \"fim\":null}");
-		placa[tsd->n_thread] = placa_recebida;
-		pos_atual[tsd->n_thread] = 0;
+		
+		strncpy(placa, placa_recebida, 8);
+		
+		tsd->placa = placa;
+		tsd->pos_atual = 0;
+		
+		printf("Placa %s\n", tsd->placa);
+		
 		for (i = 0; i < (int) sizeof(caminhos[0]); i++) {
-			if ((prox_ponto = json_array_i(pontos, i)) == JSON_INVALID)
-				break;
+			prox_ponto = json_array_i(pontos, i);
 			printf("Ponto %d\n", prox_ponto);
 			caminhos[tsd->n_thread][i] = prox_ponto;
+			if (prox_ponto == JSON_INVALID)
+				break;
 		}
 		
+		if (prox_ponto != -1) {	// ainda não achamos o fim
+			finaliza("{\"msg\":\"Muitos pontos!\", \"fim\":null}");
+		}
 		envia_fixo("{\"ok\":true}");
+		
+		// busca compatíveis:
+		comparador_da_carona_t comparador;
+		comparador.id = tsd->n_thread;
+		compara_da_carona(&comparador);
+		
+		if (comparador.melhor != -1) {
+			// pareia:
+			tsd->par = comparador.melhor;
+			tsd_array[comparador.melhor].par = tsd->n_thread;
+			muda_tipo(comparador.melhor, FILA_RECEBE_CARONA_PAREADO);
+			muda_tipo(tsd->n_thread, FILA_DA_CARONA_PAREADO);
+			
+			// envia mensagens:
+			sprintf(mensagem, "{\"parar\":%d}", comparador.parar);
+			envia_str(mensagem);
+			
+			sprintf(mensagem, "{\"placa\":\"%s\"}", tsd->placa);	///@FIXME: alguns caracteres quebram o pacote (", \...)
+			if (envia_str_outro(comparador.melhor, mensagem)) {	// falha no envio
+				pthread_kill(threads[comparador.melhor], 3);	// remove cliente defeituoso
+				finaliza("{\"msg\":\"Falha de comunicação com quem recebe carona\"}");
+			}
+		}
 		
 		for (;;) {
 			recebe_dados(&l, &json);
-			if ((pos_atual[tsd->n_thread] = json_get_int(&json, "proximo")) == JSON_INVALID)
+			if ((posicao = json_get_int(&json, "proximo")) == JSON_INVALID)
 				finaliza("{\"msg\":\"Chave \\\"proximo\\\" não encontrada\", \"fim\":null}");
+			// checa se índice é válido:
+			if (posicao >= i)
+				finaliza("{\"msg\":\"Chave \\\"proximo\\\" inválida\", \"fim\":null}");
+				
+			if (posicao > tsd->pos_atual)		// apenas avança
+				tsd->pos_atual = posicao;
+			
+			// avisa par:
+			if (tsd->par != -1)
+				if (tsd->pos_atual == tsd_array[tsd->par].pos_atual) {
+					printf("Próximo de quem recebe carona!");
+					caronas_total++;
+					envia_fixo_outro(tsd->par, "{\"chegando\":null}");
+				}
 		}
 		
 		sprintf(mensagem, "{\"msg\":\"Thread %d receberá carona!\"}", comm[tsd->n_thread]);
@@ -153,9 +202,12 @@ void* th_conecao_cliente(void *tmp) {
 	} else {
 		comparador_t comparador;
 		if ((comparador.inicio = json_get_int(&json, "inicio")) == JSON_INVALID)
-			finaliza("{\"msg\":\"Mensagem faltando ponto inicial\",\"fim\":null}");
+			finaliza("{\"msg\":\"Mensagem faltando ponto inicial\"}");
 		if ((comparador.fim = json_get_int(&json, "fim")) == JSON_INVALID)
-			finaliza("{\"msg\":\"Mensagem faltando ponto final\",\"fim\":null}");
+			finaliza("{\"msg\":\"Mensagem faltando ponto final\"}");
+		
+		tsd->inicio = comparador.inicio;
+		tsd->fim = comparador.fim;
 		
 		envia_fixo("{\"ok\":true}");
 		
@@ -163,19 +215,30 @@ void* th_conecao_cliente(void *tmp) {
 		
 		adiciona_fila(tsd->n_thread, FILA_RECEBE_CARONA);
 		
-		for (;;) {
-			
-			compara(&comparador);
-			
-			if (comparador.melhor != -1) {
-				sprintf(mensagem, "{\"parar\":%d}", comparador.parar);
-				envia_str_outro(comparador.melhor, mensagem);
-			} else {
-				printf("Ninguém compatível\n");
-				printf("IMPLEMENTE ISSO\n");
+		compara_recebe_carona(&comparador);
+		
+		if (comparador.melhor != -1) {
+			printf("Melhor carro: %d\n", comparador.melhor);
+			tsd->par = comparador.melhor;
+			tsd_array[comparador.melhor].par = tsd->n_thread;
+			tsd->pos_atual = comparador.parar;	// índice da posição de quem recebe carona
+			muda_tipo(comparador.melhor, FILA_DA_CARONA_PAREADO);
+			muda_tipo(tsd->n_thread, FILA_RECEBE_CARONA_PAREADO);
+			sprintf(mensagem, "{\"parar\":%d}", comparador.parar);
+			if (envia_str_outro(comparador.melhor, mensagem)) {	// falha no envio
+				pthread_kill(threads[comparador.melhor], 3);	// remove cliente defeituoso
+				finaliza("{\"msg\":\"Falha de comunicação com quem dá carona\"}");
 			}
 			
-			recebe_dados(&l, &json);
+			sprintf(mensagem, "{\"placa\":\"%s\"}", tsd_array[comparador.melhor].placa);	///@FIXME: alguns caracteres quebram o pacote (", \...)
+			envia_str(mensagem);
+		} else {
+			printf("Ninguém compatível\n");
+		}
+		
+		for (;;) {
+			recebe_dados(&l, &json);	// apenas para checar se a conexão continua viva
+			///@TODO: mandar mensagem a quem dá carona se a conexão for perdida (cancelar carona)
 		}
 	}
 	
