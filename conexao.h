@@ -26,6 +26,8 @@
 #define th_try0(cmd,msg)	do {if ((cmd) == NULL) {th_error(msg);}} while(0)
 #define th_tryEOF(cmd,msg)	do {if ((cmd) == EOF) {th_error(msg);}} while(0)
 
+#define MAX_PARES	30
+
 // Thread Specific Data Area - regiões alocadas para cada thread para
 // guardar variáveis da thread (se usássemos globais, haveria conflito entre
 // as threads). Ver pthread_key_create(3)
@@ -33,7 +35,7 @@ typedef struct {
 	int fd_con;		// file descriptor da conexão
 	int n_thread;	// número da thread
 	int pos_atual;	// posição do carro
-	int par, inicio, fim;
+	int pares[MAX_PARES], inicio, fim;
 	char *usuario, *placa;
 } tsd_t;
 

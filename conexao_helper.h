@@ -17,7 +17,7 @@ pthread_t threads[MAX_CLIENTES];
 pthread_mutex_t processando = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
 ///@TODO: arrumar isso, tem muita coisa declarada junto
 int s, clientes_agora = 0, clientes_total = 0, caronas_total = 0;
-int caminhos[MAX_CLIENTES][50];
+int caminhos[MAX_CLIENTES][50], posicoes_livres[MAX_CLIENTES][50];
 #ifndef NAO_CHECA_JA_CONECTADO
 __int128_t conectados[MAX_CLIENTES] = {0};	// lista de IPs já conectados
 #endif
@@ -109,14 +109,33 @@ inline void aceita_conexao(int fd_con) {
 	pthread_detach(threads[n_thread]);			// não receber retorno e liberar recursos ao final da execução
 }
 
+int par_vazio(int n) {
+	int i;
+	for (i = 0; i < MAX_PARES; i++)
+		if (tsd_array[n].pares[i] == -1)
+			return i;
+	return 0;
+}
+
 // Limpeza de recursos ao terminar thread
 void* th_limpeza(void *tmp) {
 	tsd_t *tsd = tmp;
+	int i, j;
 	
 	adquire_mutex();
-	if (tsd->par != -1) {	// se pareado, liberar o par
-		tsd[tsd->par].par = -1;
-	}
+	
+	for (i = 0; i < MAX_PARES; i++)	// se pareado, liberar os pares
+		if (tsd->pares[i] != -1)
+			for (j = 0; j < MAX_PARES; j++)
+				if (tsd_array[tsd->pares[i]].pares[j] == tsd->n_thread) {
+					tsd_array[tsd->pares[i]].pares[j] = -1;
+					if (fila[tsd->pares[i]].tipo == FILA_RECEBE_CARONA_PAREADO)	// se iria receber carona
+						fila[tsd->pares[i]].tipo = FILA_RECEBE_CARONA;			// não mais
+						write(tsd_array[tsd->pares[i]].fd_con, "{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}", sizeof("{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}" ));
+					break;
+				}
+	
+	
 	remove_fila(tsd->n_thread);
 	solta_mutex();
 	
@@ -132,6 +151,7 @@ void* th_limpeza(void *tmp) {
 	pilha_threads_livres[clientes_agora] = tsd->n_thread;
 	printf("Thread %d: disconexão\n", tsd->n_thread);
 	close(tsd->fd_con);
+	tsd->fd_con = tsd->n_thread = -1;	// desnecessário, mas facilita depuração (entradas -1 = entradas alocadas e liberadas)
 	solta_mutex();
 	return NULL;
 }
@@ -198,18 +218,21 @@ void recebe_dados(leitura_t *l, json_parser *json) {
 	adquire_mutex();
 }
 
-int distancia(int da_carona, int inicio, int fim) {
+int distancia(int da_carona, int recebe_carona) {
 	int i, j;
-	if (fila[da_carona].tipo != FILA_DA_CARONA)
+	if (fila[da_carona].tipo != FILA_DA_CARONA || fila[recebe_carona].tipo != FILA_RECEBE_CARONA ||
+		par_vazio(da_carona) == -1)
 		return -1;
 	
 	for (i = 0; i < (int) sizeof(caminhos[0]) && caminhos[da_carona][i] != -1; i++) {
-		if (caminhos[da_carona][i] == inicio) {
-			for (j = i + 1; j < (int) sizeof(caminhos[0]) && caminhos[da_carona][j] != -1; j++) {
-				if (caminhos[da_carona][j] == fim) {
+		if (caminhos[da_carona][i] == tsd_array[recebe_carona].inicio) {
+			for (j = i; j < (int) sizeof(caminhos[0]) && caminhos[da_carona][j] != -1; j++) {
+				if (caminhos[da_carona][j] == tsd_array[recebe_carona].fim) {
 					printf("Compatível: %d, distância %d\n", da_carona, j - i);
 					return j - i;
-				}
+				}				
+				if (posicoes_livres[da_carona][j] == 0)
+					return -1;	// sem lugar livre
 			}
 			break;
 		}
@@ -217,16 +240,28 @@ int distancia(int da_carona, int inicio, int fim) {
 	return -1;
 }
 
+int parada(int carro, int passageiro) {
+	int i = 0, j;
+	while (caminhos[carro][i] != tsd_array[passageiro].inicio)
+		i++;
+	j = i;
+	while (caminhos[carro][j] != tsd_array[passageiro].fim) {
+		posicoes_livres[carro][j]--;
+		j++;
+	}
+	return i;
+}
+
 typedef struct {
-	int inicio, fim, melhor, parar;
+	int id, melhor, parar;
 } comparador_t;
 
 void compara_recebe_carona(comparador_t *compara) {
-	int comparar_com = -1, d_menor = 2000, i, d_atual;
+	int comparar_com = -1, d_menor = 2000, d_atual;
 	compara->melhor = -1;
 	while ((comparar_com = prox_fila(comparar_com)) != -1) {
 		printf("Comparando com %d\n", comparar_com);
-		d_atual = distancia(comparar_com, compara->inicio, compara->fim);
+		d_atual = distancia(comparar_com, compara->id);
 		if (d_atual != -1) {  // caminho compatível
 			if (d_atual < d_menor) {
 				d_menor = d_atual;
@@ -235,44 +270,16 @@ void compara_recebe_carona(comparador_t *compara) {
 		}
 	}
 	// seta ponto de parada:
-	if (compara->melhor != -1) {
-		for (i = 1; i < (int) sizeof(caminhos[0]); i++) {
-			if (caminhos[compara->melhor][i] == compara->fim) {
-				compara->parar = i;
-			}
-		}
-	}
+	if (compara->melhor != -1)
+		compara->parar = parada(compara->melhor, compara->id);
 }
 
-int distancia_da_carona(int da_carona, int compara_com) {
-	int i, j, inicio = tsd_array[compara_com].inicio, fim = tsd_array[compara_com].fim;
-	if (fila[compara_com].tipo != FILA_RECEBE_CARONA)
-		return -1;
-	
-	for (i = 0; i < (int) sizeof(caminhos[0]) && caminhos[da_carona][i] != -1; i++) {
-		if (caminhos[da_carona][i] == inicio) {
-			for (j = i + 1; j < (int) sizeof(caminhos[0]); j++) {
-				if (caminhos[da_carona][j] == fim) {
-					printf("Compatível: %d, distância %d\n", da_carona, j - i);
-					return j - i;
-				}
-			}
-			break;
-		}
-	}
-	return -1;
-}
-
-typedef struct {
-	int id, melhor, parar;
-} comparador_da_carona_t;
-
-void compara_da_carona(comparador_da_carona_t *compara) {
-	int comparar_com = -1, d_maior = 0, i, d_atual;
+void compara_da_carona(comparador_t *compara) {
+	int comparar_com = -1, d_maior = 0, d_atual;
 	compara->melhor = -1;
 	while ((comparar_com = prox_fila(comparar_com)) != -1) {
 		printf("Comparando com %d\n", comparar_com);
-		d_atual = distancia_da_carona(compara->id, comparar_com);
+		d_atual = distancia(compara->id, comparar_com);
 		if (d_atual != -1) {  // caminho compatível
 			if (d_atual > d_maior) {
 				d_maior = d_atual;
@@ -281,13 +288,8 @@ void compara_da_carona(comparador_da_carona_t *compara) {
 		}
 	}
 	// seta ponto de parada:
-	if (compara->melhor != -1) {
-		for (i = 1; i < (int) sizeof(caminhos[0]); i++) {
-			if (caminhos[compara->id][i] == tsd_array[compara->melhor].fim) {
-				compara->parar = i;
-			}
-		}
-	}
+	if (compara->melhor != -1)
+		compara->parar = parada(compara->melhor, compara->id);
 }
 
 #endif
