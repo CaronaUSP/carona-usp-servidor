@@ -93,9 +93,10 @@ int add_user(const char *email, const char *hash) {
 	if ((novo = get_user_struct(email)) != NULL) {		// já existe
 		printf("Usuário %s já existe, atualizando senha\n", email);
 		strncpy((char *) novo->hash, hash, 64);
+		return 0;
 	}
 	
-	novo = malloc(sizeof(usuario_t));
+	novo = malloc(sizeof(usuario_t) + strlen(email) + 1);
 	if (novo == NULL)
 		return -1;
 	if (ultimo_usuario != NULL) {	// primeiro do servidor
@@ -105,7 +106,10 @@ int add_user(const char *email, const char *hash) {
 		primeiro_usuario = novo;
 		ultimo_usuario = novo;
 	}
-	novo->email = email;
+	
+	char *copia_email = (char *) (novo + 1);
+	strcpy(copia_email, email);
+	novo->email = copia_email;
 	novo->hash = hash;
 	novo->next = NULL;
 	return 0;
