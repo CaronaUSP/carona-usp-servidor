@@ -47,8 +47,6 @@ void* th_conecao_cliente(void *tmp) {
 	json.pairs = pairs;
 	json.n_pairs = 200;
 	
-	tsd->par = -1;
-	
 	recebe_dados(&l, &json);
 	
 	if ((hash = json_get_str(&json, "hash")) == NULL) {
@@ -121,12 +119,23 @@ void* th_conecao_cliente(void *tmp) {
 	recebe_dados(&l, &json);
 	
 	const char *pontos = json_get_array(&json, "pontos");
-	
 	int i;
+	comparador_t comparador;
+	comparador.id = tsd->n_thread;
+	
+	for (i = 0; i < MAX_PARES; i++)
+		tsd->pares[i] = -1;
+	
 	if (pontos != NULL) {
 		
 		int prox_ponto, posicao;
 		char *placa_recebida, placa[9] = {0};
+		int lugares = json_get_int(&json, "lugares");
+		if (lugares == JSON_INVALID) {
+			printf("Chave \"lugares\" não encontrada, assumindo 1\n");
+			lugares = 1;
+		} else
+			printf("%d lugares", lugares);
 		adiciona_fila(tsd->n_thread, FILA_DA_CARONA);
 		placa_recebida = json_get_str(&json, "placa");
 		if (placa_recebida == NULL)
@@ -145,24 +154,23 @@ void* th_conecao_cliente(void *tmp) {
 			caminhos[tsd->n_thread][i] = prox_ponto;
 			if (prox_ponto == JSON_INVALID)
 				break;
+			posicoes_livres[tsd->n_thread][i] = lugares;
 		}
 		
-		if (prox_ponto != -1) {	// ainda não achamos o fim
+		if (prox_ponto != -1)	// ainda não achamos o fim
 			finaliza("{\"msg\":\"Muitos pontos!\", \"fim\":null}");
-		}
+		
 		envia_fixo("{\"ok\":true}");
 		
 		// busca compatíveis:
-		comparador_da_carona_t comparador;
-		comparador.id = tsd->n_thread;
 		compara_da_carona(&comparador);
 		
 		if (comparador.melhor != -1) {
 			// pareia:
-			tsd->par = comparador.melhor;
-			tsd_array[comparador.melhor].par = tsd->n_thread;
+			tsd->pares[0] = comparador.melhor;
+			tsd_array[comparador.melhor].pares[0] = tsd->n_thread;
 			muda_tipo(comparador.melhor, FILA_RECEBE_CARONA_PAREADO);
-			muda_tipo(tsd->n_thread, FILA_DA_CARONA_PAREADO);
+			//muda_tipo(tsd->n_thread, FILA_DA_CARONA_PAREADO);
 			
 			// envia mensagens:
 			sprintf(mensagem, "{\"parar\":%d}", comparador.parar);
@@ -187,12 +195,13 @@ void* th_conecao_cliente(void *tmp) {
 				tsd->pos_atual = posicao;
 			
 			// avisa par:
-			if (tsd->par != -1)
-				if (tsd->pos_atual == tsd_array[tsd->par].pos_atual) {
-					printf("Próximo de quem recebe carona!");
-					caronas_total++;
-					envia_fixo_outro(tsd->par, "{\"chegando\":null}");
-				}
+			for (i = 0; i < MAX_PARES; i++)
+				if (tsd->pares[i] != -1)
+					if (tsd->pos_atual == tsd_array[tsd->pares[i]].pos_atual) {
+						printf("Próximo de %d!\n", tsd->pares[i]);
+						caronas_total++;
+						envia_fixo_outro(tsd->pares[i], "{\"chegando\":null}");
+					}
 		}
 		
 		sprintf(mensagem, "{\"msg\":\"Thread %d receberá carona!\"}", comm[tsd->n_thread]);
@@ -200,14 +209,10 @@ void* th_conecao_cliente(void *tmp) {
 		
 		
 	} else {
-		comparador_t comparador;
-		if ((comparador.inicio = json_get_int(&json, "inicio")) == JSON_INVALID)
+		if ((tsd->inicio = json_get_int(&json, "inicio")) == JSON_INVALID)
 			finaliza("{\"msg\":\"Mensagem faltando ponto inicial\"}");
-		if ((comparador.fim = json_get_int(&json, "fim")) == JSON_INVALID)
+		if ((tsd->fim = json_get_int(&json, "fim")) == JSON_INVALID)
 			finaliza("{\"msg\":\"Mensagem faltando ponto final\"}");
-		
-		tsd->inicio = comparador.inicio;
-		tsd->fim = comparador.fim;
 		
 		envia_fixo("{\"ok\":true}");
 		
@@ -219,10 +224,10 @@ void* th_conecao_cliente(void *tmp) {
 		
 		if (comparador.melhor != -1) {
 			printf("Melhor carro: %d\n", comparador.melhor);
-			tsd->par = comparador.melhor;
-			tsd_array[comparador.melhor].par = tsd->n_thread;
+			tsd->pares[0] = comparador.melhor;
+			tsd_array[comparador.melhor].pares[par_vazio(comparador.melhor)] = tsd->n_thread;
 			tsd->pos_atual = comparador.parar;	// índice da posição de quem recebe carona
-			muda_tipo(comparador.melhor, FILA_DA_CARONA_PAREADO);
+			//muda_tipo(comparador.melhor, FILA_DA_CARONA_PAREADO);
 			muda_tipo(tsd->n_thread, FILA_RECEBE_CARONA_PAREADO);
 			sprintf(mensagem, "{\"parar\":%d}", comparador.parar);
 			if (envia_str_outro(comparador.melhor, mensagem)) {	// falha no envio
@@ -245,4 +250,3 @@ void* th_conecao_cliente(void *tmp) {
 	pthread_cleanup_pop(1);
 	return NULL;
 }
-
