@@ -92,6 +92,7 @@ int add_user(const char *email, const char *hash) {
 	
 	if ((novo = get_user_struct(email)) != NULL) {		// já existe
 		printf("Usuário %s já existe, atualizando senha\n", email);
+		///@TODO: free() da estrutura se possível
 		strncpy((char *) novo->hash, hash, 64);
 		return 0;
 	}
@@ -108,9 +109,11 @@ int add_user(const char *email, const char *hash) {
 	}
 	
 	char *copia_email = (char *) (novo + 1);
+	char *copia_hash = malloc(strlen(hash) + 1);	///@TODO: alocar tudo de uma vez
 	strcpy(copia_email, email);
+	strcpy(copia_hash, hash);
 	novo->email = copia_email;
-	novo->hash = hash;
+	novo->hash = copia_hash;
 	novo->next = NULL;
 	return 0;
 }
