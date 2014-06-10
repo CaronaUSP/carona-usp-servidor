@@ -131,6 +131,7 @@ void* th_limpeza(void *tmp) {
 			for (j = 0; j < MAX_PARES; j++)
 				if (tsd_array[tsd->pares[i]].pares[j] == tsd->n_thread) {
 					tsd_array[tsd->pares[i]].pares[j] = -1;
+					printf("Avisando %d da perda\n", tsd->pares[i]);
 					if (fila[tsd->pares[i]].tipo == FILA_RECEBE_CARONA_PAREADO) {	// se outro iria receber carona
 						fila[tsd->pares[i]].tipo = FILA_RECEBE_CARONA;			// não mais
 						write(tsd_array[tsd->pares[i]].fd_con, "{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}", sizeof("{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}" ));
