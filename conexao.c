@@ -144,7 +144,7 @@ void* th_conecao_cliente(void *tmp) {
 		strncpy(placa, placa_recebida, 8);
 		
 		tsd->placa = placa;
-		tsd->pos_atual = 0;
+		tsd->pos_atual = -1;
 		
 		printf("Placa %s\n", tsd->placa);
 		
@@ -197,7 +197,7 @@ void* th_conecao_cliente(void *tmp) {
 			// avisa par:
 			for (i = 0; i < MAX_PARES; i++)
 				if (tsd->pares[i] != -1)
-					if (tsd->pos_atual == tsd_array[tsd->pares[i]].pos_atual) {
+					if (posicao == tsd_array[tsd->pares[i]].pos_atual) {
 						printf("Próximo de %d!\n", tsd->pares[i]);
 						caronas_total++;
 						envia_fixo_outro(tsd->pares[i], "{\"chegando\":null}");

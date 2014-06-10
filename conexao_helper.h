@@ -237,7 +237,7 @@ int distancia(int da_carona, int recebe_carona) {
 		par_vazio(da_carona) == -1)
 		return -1;
 	
-	for (i = 0; i < (int) sizeof(caminhos[0]) && caminhos[da_carona][i] != -1; i++) {
+	for (i = tsd_array[da_carona].pos_atual + 1; i < (int) sizeof(caminhos[0]) && caminhos[da_carona][i] != -1; i++) {
 		if (caminhos[da_carona][i] == tsd_array[recebe_carona].inicio) {
 			for (j = i; j < (int) sizeof(caminhos[0]) && caminhos[da_carona][j] != -1; j++) {
 				if (caminhos[da_carona][j] == tsd_array[recebe_carona].fim) {
