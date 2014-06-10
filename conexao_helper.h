@@ -124,17 +124,30 @@ void* th_limpeza(void *tmp) {
 	
 	adquire_mutex();
 	
-	for (i = 0; i < MAX_PARES; i++)	// se pareado, liberar os pares
-		if (tsd->pares[i] != -1)
-			for (j = 0; j < MAX_PARES; j++)
-				if (tsd_array[tsd->pares[i]].pares[j] == tsd->n_thread) {
-					tsd_array[tsd->pares[i]].pares[j] = -1;
-					if (fila[tsd->pares[i]].tipo == FILA_RECEBE_CARONA_PAREADO)	// se iria receber carona
-						fila[tsd->pares[i]].tipo = FILA_RECEBE_CARONA;			// não mais
-						write(tsd_array[tsd->pares[i]].fd_con, "{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}", sizeof("{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}" ));
-					break;
+	for (i = 0; i < MAX_PARES; i++) {	// se pareado, liberar os pares
+		if (tsd->pares[i] == -1)
+			break;
+		for (j = 0; j < MAX_PARES; j++)
+			if (tsd_array[tsd->pares[i]].pares[j] == tsd->n_thread) {
+				tsd_array[tsd->pares[i]].pares[j] = -1;
+				if (fila[tsd->pares[i]].tipo == FILA_RECEBE_CARONA_PAREADO) {	// se outro iria receber carona
+					fila[tsd->pares[i]].tipo = FILA_RECEBE_CARONA;			// não mais
+					write(tsd_array[tsd->pares[i]].fd_con, "{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}", sizeof("{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}" ));
+				} else if (fila[tsd->pares[i]].tipo == FILA_DA_CARONA) {	// se outro iria dar carona
+					// libera lugares:
+					int k = 0, l = 0;
+					while (caminhos[tsd->pares[i]][k] != tsd->inicio)
+						k++;
+					l = k;
+					while (caminhos[tsd->pares[i]][l] != tsd->fim) {
+						posicoes_livres[tsd->pares[i]][l]++;
+						l++;
+					}
+					write(tsd_array[tsd->pares[i]].fd_con, "{\"msg\":\"Conexão perdida com um carona\"}", sizeof("{\"msg\":\"Conexão perdida com um carona\"}"));
 				}
-	
+				break;
+			}
+	}
 	
 	remove_fila(tsd->n_thread);
 	solta_mutex();

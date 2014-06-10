@@ -135,7 +135,7 @@ void* th_conecao_cliente(void *tmp) {
 			printf("Chave \"lugares\" não encontrada, assumindo 1\n");
 			lugares = 1;
 		} else
-			printf("%d lugares", lugares);
+			printf("%d lugares\n", lugares);
 		adiciona_fila(tsd->n_thread, FILA_DA_CARONA);
 		placa_recebida = json_get_str(&json, "placa");
 		if (placa_recebida == NULL)
