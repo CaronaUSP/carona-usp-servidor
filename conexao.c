@@ -163,6 +163,7 @@ void* th_conecao_cliente(void *tmp) {
 			// pareia:
 			tsd->pares[0] = comparador.melhor;
 			tsd_array[comparador.melhor].pares[0] = tsd->n_thread;
+			tsd_array[comparador.melhor].pos_atual = comparador.parar;
 			muda_tipo(comparador.melhor, FILA_RECEBE_CARONA_PAREADO);
 			//muda_tipo(tsd->n_thread, FILA_DA_CARONA_PAREADO);
 			
