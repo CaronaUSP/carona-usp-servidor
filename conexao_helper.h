@@ -127,7 +127,7 @@ void* th_limpeza(void *tmp) {
 		adquire_mutex();
 		for (i = 0; i < MAX_PARES; i++) {	// se pareado, liberar os pares
 			if (tsd->pares[i] == -1)
-				break;
+				continue;
 			for (j = 0; j < MAX_PARES; j++)
 				if (tsd_array[tsd->pares[i]].pares[j] == tsd->n_thread) {
 					tsd_array[tsd->pares[i]].pares[j] = -1;
@@ -144,7 +144,8 @@ void* th_limpeza(void *tmp) {
 							posicoes_livres[tsd->pares[i]][l]++;
 							l++;
 						}
-						write(tsd_array[tsd->pares[i]].fd_con, "{\"msg\":\"Conexão perdida com um carona\"}", sizeof("{\"msg\":\"Conexão perdida com um carona\"}"));
+						if (tsd_array[tsd->pares[i]].fd_con != 1 && tsd_array[tsd->pares[i]].fd_con != 2)
+							write(tsd_array[tsd->pares[i]].fd_con, "{\"msg\":\"Conexão perdida com um carona\"}", sizeof("{\"msg\":\"Conexão perdida com um carona\"}"));
 					}
 					break;
 				}

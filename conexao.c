@@ -148,7 +148,7 @@ void* th_conecao_cliente(void *tmp) {
 			caminhos[tsd->n_thread][i] = prox_ponto;
 			if (prox_ponto == JSON_INVALID)
 				break;
-			posicoes_livres[tsd->n_thread][i] = lugares;
+			posicoes_livres[tsd->n_thread][i] = lugares;	// último índice é desnecessário
 		}
 		
 		if (prox_ponto != -1)	// ainda não achamos o fim
