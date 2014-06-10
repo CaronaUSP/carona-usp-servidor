@@ -17,8 +17,9 @@ void* th_conecao_cliente(void *tmp) {
 	tsd_t *tsd = tmp;	// o argumento é um ponteiro para qqr área definida pelo programa,
 						// então precisamos marcar o tipo de ponteiro recebido ou usar casts
 	leitura_t l;
+	int i;
 	char resposta[2000];
-	const char *hash, *usuario;
+	const char *hash;
 	char str_hash[500];
 	char mensagem[1000];	///@FIXME: assume que dados cabem em 1000 bytes
 	json_parser json;
@@ -47,6 +48,9 @@ void* th_conecao_cliente(void *tmp) {
 	json.pairs = pairs;
 	json.n_pairs = 200;
 	
+	for (i = 0; i < MAX_PARES; i++)
+		tsd->pares[i] = -1;
+	
 	recebe_dados(&l, &json);
 	
 	if ((hash = json_get_str(&json, "hash")) == NULL) {
@@ -61,9 +65,9 @@ void* th_conecao_cliente(void *tmp) {
 	}
 	#endif
 	
-	usuario = json_get_str(&json, "usuario");
+	tsd->usuario = json_get_str(&json, "usuario");
 	
-	if (usuario == NULL) {
+	if (tsd->usuario == NULL) {
 		printf("Chave \"usuario\" não encontrada\n");
 		finaliza("{\"msg\":\"JSON: chave \\\"usuario\\\" não encontrada\"}");
 	}
@@ -72,16 +76,10 @@ void* th_conecao_cliente(void *tmp) {
 		int cod = abs((int) random()), entrada_usuario;
 		printf("Novo usuário, criando cadastro\nCódigo: %d\n", cod);
 		#ifndef NAO_ENVIA_EMAIL
-		if (envia_email(usuario, cod) == -1)
+		if (envia_email(tsd->usuario, cod) == -1)
 			finaliza("{\"msg\":\"Falha no envio de e-mail de confirmação\"}");
 		#endif
 		envia_fixo("{\"ok\":true}");
-		
-		char usuario_salvo[250], hash_salvo[65];
-		strncpy(usuario_salvo, usuario, sizeof(usuario_salvo));
-		usuario_salvo[sizeof(usuario_salvo) - 1] = 0;
-		strncpy(hash_salvo, hash, sizeof(hash_salvo));
-		hash_salvo[sizeof(hash_salvo) - 1] = 0;
 		
 		do {
 			recebe_dados(&l, &json);
@@ -96,12 +94,12 @@ void* th_conecao_cliente(void *tmp) {
 			
 		} while (entrada_usuario != cod);
 		
-		add_user(usuario_salvo, hash_salvo);
+		add_user(tsd->usuario, hash);
 		
 	} else {
 		#ifndef NAO_CHECA_SENHA
 		for (;;) {
-			const char *hash_senha = get_user(usuario);
+			const char *hash_senha = get_user(tsd->usuario);
 			if (hash_senha == NULL) {
 				finaliza("{\"msg\":\"Usuário não cadastrado\"}");
 			}
@@ -119,12 +117,8 @@ void* th_conecao_cliente(void *tmp) {
 	recebe_dados(&l, &json);
 	
 	const char *pontos = json_get_array(&json, "pontos");
-	int i;
 	comparador_t comparador;
 	comparador.id = tsd->n_thread;
-	
-	for (i = 0; i < MAX_PARES; i++)
-		tsd->pares[i] = -1;
 	
 	if (pontos != NULL) {
 		

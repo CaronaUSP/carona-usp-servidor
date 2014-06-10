@@ -41,7 +41,7 @@ tsd_t tsd_array[MAX_CLIENTES];
 #define th_try(cmd,msg)		do {if ((cmd) == -1) {th_error(msg);}} while(0)
 // Envia string por outra thread:
 #define envia_str_outro(thread, str)		envia_outro(thread, str, strlen(str) + 1)
-// Envia variável com tamanho fixo ppor outra thread:
+// Envia variável com tamanho fixo por outra thread:
 #define envia_fixo_outro(thread, objeto)	envia_outro(thread, objeto, sizeof(objeto))
 
 int envia_outro(int thread, char *msg, size_t len) {
@@ -102,6 +102,7 @@ inline void aceita_conexao(int fd_con) {
 	
 	tsd_array[n_thread].n_thread = n_thread;	///@TODO: ao invés de salvar n_thread na tsd, dá pra recuperar calculando o índice da entrada
 	tsd_array[n_thread].fd_con = fd_con;
+	tsd_array[n_thread].usuario = NULL;			// não logado
 	
 	pthread_mutex_unlock(&processando);
 	
@@ -122,36 +123,37 @@ void* th_limpeza(void *tmp) {
 	tsd_t *tsd = tmp;
 	int i, j;
 	
-	adquire_mutex();
-	
-	for (i = 0; i < MAX_PARES; i++) {	// se pareado, liberar os pares
-		if (tsd->pares[i] == -1)
-			break;
-		for (j = 0; j < MAX_PARES; j++)
-			if (tsd_array[tsd->pares[i]].pares[j] == tsd->n_thread) {
-				tsd_array[tsd->pares[i]].pares[j] = -1;
-				if (fila[tsd->pares[i]].tipo == FILA_RECEBE_CARONA_PAREADO) {	// se outro iria receber carona
-					fila[tsd->pares[i]].tipo = FILA_RECEBE_CARONA;			// não mais
-					write(tsd_array[tsd->pares[i]].fd_con, "{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}", sizeof("{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}" ));
-				} else if (fila[tsd->pares[i]].tipo == FILA_DA_CARONA) {	// se outro iria dar carona
-					// libera lugares:
-					int k = 0, l = 0;
-					while (caminhos[tsd->pares[i]][k] != tsd->inicio)
-						k++;
-					l = k;
-					while (caminhos[tsd->pares[i]][l] != tsd->fim) {
-						posicoes_livres[tsd->pares[i]][l]++;
-						l++;
-					}
-					write(tsd_array[tsd->pares[i]].fd_con, "{\"msg\":\"Conexão perdida com um carona\"}", sizeof("{\"msg\":\"Conexão perdida com um carona\"}"));
-				}
+	if (tsd->usuario != NULL) {		// já logado?
+		adquire_mutex();
+		for (i = 0; i < MAX_PARES; i++) {	// se pareado, liberar os pares
+			if (tsd->pares[i] == -1)
 				break;
-			}
+			for (j = 0; j < MAX_PARES; j++)
+				if (tsd_array[tsd->pares[i]].pares[j] == tsd->n_thread) {
+					tsd_array[tsd->pares[i]].pares[j] = -1;
+					if (fila[tsd->pares[i]].tipo == FILA_RECEBE_CARONA_PAREADO) {	// se outro iria receber carona
+						fila[tsd->pares[i]].tipo = FILA_RECEBE_CARONA;			// não mais
+						write(tsd_array[tsd->pares[i]].fd_con, "{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}", sizeof("{\"msg\":\"Sem conexão com motorista, esperando outra carona\"}" ));
+					} else if (fila[tsd->pares[i]].tipo == FILA_DA_CARONA) {	// se outro iria dar carona
+						// libera lugares:
+						int k = 0, l = 0;
+						while (caminhos[tsd->pares[i]][k] != tsd->inicio)
+							k++;
+						l = k;
+						while (caminhos[tsd->pares[i]][l] != tsd->fim) {
+							posicoes_livres[tsd->pares[i]][l]++;
+							l++;
+						}
+						write(tsd_array[tsd->pares[i]].fd_con, "{\"msg\":\"Conexão perdida com um carona\"}", sizeof("{\"msg\":\"Conexão perdida com um carona\"}"));
+					}
+					break;
+				}
+		}
+		remove_fila(tsd->n_thread);
+		solta_mutex();
 	}
 	
-	remove_fila(tsd->n_thread);
-	solta_mutex();
-	
+	// pode gerar SIGPIPE se já estiver fechada
 	write(tsd->fd_con, "{\"fim\":null}", sizeof("{\"fim\":null}"));
 	///@TODO: esperar cliente fechar a conexão ao invés de sleep()
 	sleep(5);
@@ -302,7 +304,7 @@ void compara_da_carona(comparador_t *compara) {
 	}
 	// seta ponto de parada:
 	if (compara->melhor != -1)
-		compara->parar = parada(compara->melhor, compara->id);
+		compara->parar = parada(compara->id, compara->melhor);
 }
 
 #endif
