@@ -181,22 +181,25 @@ void* th_conecao_cliente(void *tmp) {
 		for (;;) {
 			recebe_dados(&l, &json);
 			if ((posicao = json_get_int(&json, "proximo")) == JSON_INVALID)
-				finaliza("{\"msg\":\"Chave \\\"proximo\\\" não encontrada\", \"fim\":null}");
-			// checa se índice é válido:
-			if (posicao >= i)
-				finaliza("{\"msg\":\"Chave \\\"proximo\\\" inválida\", \"fim\":null}");
+				printf("Chave \"proximo\" não encontrada\n");
+				//finaliza("{\"msg\":\"Chave \\\"proximo\\\" não encontrada\", \"fim\":null}");
+			else {
+				// checa se índice é válido:
+				if (posicao >= i)
+					finaliza("{\"msg\":\"Chave \\\"proximo\\\" inválida\", \"fim\":null}");
+					
+				if (posicao > tsd->pos_atual)		// apenas avança
+					tsd->pos_atual = posicao;
 				
-			if (posicao > tsd->pos_atual)		// apenas avança
-				tsd->pos_atual = posicao;
-			
-			// avisa par:
-			for (i = 0; i < MAX_PARES; i++)
-				if (tsd->pares[i] != -1)
-					if (posicao == tsd_array[tsd->pares[i]].pos_atual) {
-						printf("Próximo de %d!\n", tsd->pares[i]);
-						caronas_total++;
-						envia_fixo_outro(tsd->pares[i], "{\"chegando\":null}");
-					}
+				// avisa par:
+				for (i = 0; i < MAX_PARES; i++)
+					if (tsd->pares[i] != -1)
+						if (posicao == tsd_array[tsd->pares[i]].pos_atual) {
+							printf("Próximo de %d!\n", tsd->pares[i]);
+							caronas_total++;
+							envia_fixo_outro(tsd->pares[i], "{\"chegando\":null}");
+						}
+			}
 		}
 		
 		sprintf(mensagem, "{\"msg\":\"Thread %d receberá carona!\"}", comm[tsd->n_thread]);
