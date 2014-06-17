@@ -1,0 +1,24 @@
+Correções no que está feito:
+- Comentar e organizar o código
+- Na perda de conexão, tirar envio de "fim" se conexão já tiver fechada (removendo SIGPIPE)
+- Corrigir bugs na perda de conexão (aparecem pares inválidos. É raro e geralmente o write falha, mas pode ir em um fd aberto e às vezes vai para fd = 1 = saída padrão, o que são problemas graves)
+- Melhorar saída (ter um loglevel + salvar saída em arquivos separados por execução)
+- Talvez seja uma boa ideia tirar a estrutura em threads e usar poll ou, preferencialmente, epoll (man 7 epoll). Parece mais protegido de bugs
+- Testar e encontrar novos bugs
+
+Coisas a fazer:
+- Cancelar carona se carona sai do ponto
+- Ícone dinâmico com posição do caronista no mapa do carona
+- Pesquisa com alunos sobre ideias/trajetos mais feitos/interesse em dar ou receber carona na USP/problemas no aplicativo
+- Publicação: depois de resolver alguns dos problemas acima. Seria legal procurar um grupo de testers antes?
+- Checar todos os @TODO e @FIXME do código e ver o que deve ser feito
+
+Ideias novas e viagens:
+- Sistema de pontuação para incentivar caronas: quem dá carona ganha um número de pontos que podem ser dados a um amigo que precisa de carona. Talvez colocar pessoas com pontos com prioridade um pouco maior?
+- Usar mais o potencial do aplicativo (exemplo: permitir que caronas deixem o aplicativo ligado no circular e assim ter a posição atual dos circulares na USP, tornando essa informação pública)
+- Possivelmente, estender o aplicativo pra fora da USP no futuro
+
+Como/quando/quem:
+- Pretendo continuar o que der nas férias
+- Ver quem deseja continuar o desenvolvimento e buscar novos interessados
+- Máquina virtual - até agora, continuamos com acesso à do trabalho, precisamos confirmar se vamos ficar com ela por tempo indeterminado ou devemos usar outra
