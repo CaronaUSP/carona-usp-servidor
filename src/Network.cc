@@ -201,7 +201,7 @@ namespace Network {
 		CURL_SETOPT(CURLOPT_URL, SMTP_ADDRESS);
 		CURL_SETOPT(CURLOPT_READFUNCTION, read_callback);
 		CURL_SETOPT(CURLOPT_READDATA, (void *) this);
-		recipient = curl_slist_append(recipient_string.c_str(), to.c_str());
+		recipient = curl_slist_append(recipient, to.c_str());
 		CURL_SETOPT(CURLOPT_MAIL_RCPT, recipient);
 		CURL_SETOPT(CURLOPT_UPLOAD, 1L);
 		CURL_SETOPT(CURLOPT_VERBOSE, 1L);
@@ -248,6 +248,7 @@ namespace Network {
 			"Subject: Confirmação de e-mail - Carona USP\r\n"	\
 			"\r\n"												+
 			text;
+		CURLcode code;
 		code = curl_easy_perform(curl);
 		if (code != CURLE_OK) {
 			LOG(ERROR) << "curl_easy_perform(): " << code << " - " << curl_easy_strerror(code);

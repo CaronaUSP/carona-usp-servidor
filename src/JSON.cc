@@ -68,6 +68,10 @@ namespace JSON {
 		return value;
 	}
 
+	const rapidjson::Document& Socket::get_document() const {
+		return document;
+	}
+
 	File::File(const char *filename) : filename(std::string(filename)) {
 		load();
 	}

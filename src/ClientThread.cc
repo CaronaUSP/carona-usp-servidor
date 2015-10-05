@@ -38,7 +38,7 @@ namespace Client {
 				socket.send(hello_packet);
 
 				if (socket.next()) {
-					if (socket["usuario"] == "cadastro") {
+					if (socket.get_document().HasMember("cadastro")) {
 						uint64_t code = generate_random_64();
 						LOG(INFO) << "New user: code " << code;
 

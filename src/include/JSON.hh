@@ -34,6 +34,7 @@ namespace JSON {
 		const rapidjson::Value& operator[](const std::string& key) const;
 		bool next();
 		void send(const rapidjson::Document& document);
+		const rapidjson::Document& get_document() const;
 
 	private:
 		rapidjson::Document document;
