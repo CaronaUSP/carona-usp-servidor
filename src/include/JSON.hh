@@ -28,6 +28,7 @@ namespace JSON {
 		size_t pos = 0;
 	};
 
+	/// @todo Can be done cleanly with inheritation
 	class Socket : public Network::Socket {
 	public:
 		Socket(int fd);
@@ -41,6 +42,7 @@ namespace JSON {
 		SocketStream socketStream;
 	};
 
+	/// @todo Can be done cleanly with inheritation
 	class File {
 	public:
 		File(const char *filename);

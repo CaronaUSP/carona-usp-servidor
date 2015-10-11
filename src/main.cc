@@ -9,6 +9,7 @@
 #include <rapidjson/filereadstream.h>
 
 #include "ClientThread.hh"
+#include "Database.hh"
 #include "JSON.hh"
 #include "Network.hh"
 
@@ -37,12 +38,21 @@ namespace {
 	}
 }
 
+static void sqlite_log_callback(__attribute__((unused)) void *ignored, int code, const char *message) {
+	std::cerr << "sqlite: " << message << " (" << code << ")\n";
+}
+
 int main(int argc, char **argv) {
+	// Some of these calls might be thread-unsafe initializations/deallocations,
+	// so we keep them here at main() to avoid future problems.
 	SSL_load_error_strings();
 	SSL_library_init();
 	FLAGS_log_dir = ".";
 	google::InitGoogleLogging(argv[0]);
 	google::InstallFailureSignalHandler();
+
+	sqlite3_config(SQLITE_CONFIG_LOG, sqlite_log_callback, NULL);
+	sqlite3_initialize();
 
 	CURLcode ret;
 	ret = curl_global_init(CURL_GLOBAL_ALL);
@@ -52,11 +62,16 @@ int main(int argc, char **argv) {
 	}
 
 	try {
+		Database database;
+		database.load("file:database.db");
 		start_server();
+		database.close();
 	} catch (std::exception& e) {
 		std::cerr << e.what() << '\n';
 	}
-	google::ShutdownGoogleLogging();
+	
 	ERR_free_strings();
+	sqlite3_shutdown();
+	google::ShutdownGoogleLogging();
 	return 0;
 }

@@ -79,12 +79,12 @@ namespace JSON {
 	File::File() {}
 
 	File::~File() {
-		char *file_buffer = new char[1024 * 1024];
 		FILE* file = fopen(filename.c_str(), "w");
 		if (file == NULL) {
 			perror("fopen");
 			throw std::runtime_error("fopen");
 		}
+		char *file_buffer = new char[1024 * 1024];
 		rapidjson::FileWriteStream stream(file, file_buffer, 1024 * 1024);
 		rapidjson::Writer<rapidjson::FileWriteStream> writer(stream);
 		document->Accept(writer);

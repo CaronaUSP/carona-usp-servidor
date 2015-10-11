@@ -4,8 +4,9 @@ json_server_demo_SOURCES = src/programs/json_server_demo.cc src/JSON.cc \
 	src/Network.cc
 json_server_demo_LDADD = -lssl -lcrypto -lglog
 
-main_SOURCES = src/main.cc src/ClientThread.cc src/JSON.cc src/Network.cc
-main_LDADD = -lssl -lcrypto -lglog -lpthread -lcurl
+main_SOURCES = src/main.cc src/ClientThread.cc src/JSON.cc src/Network.cc \
+	src/Database.cc
+main_LDADD = -lssl -lcrypto -lglog -lpthread -lcurl -lsqlite3
 
 ssl_server_demo_SOURCES = src/programs/ssl_server_demo.cc src/Network.cc
 ssl_server_demo_LDADD = -lssl -lcrypto -lglog
